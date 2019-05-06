@@ -20,6 +20,7 @@ package org.apache.skywalking.oap.server.cluster.plugin.consul;
 
 import com.google.common.net.HostAndPort;
 import com.orbitz.consul.Consul;
+import com.orbitz.consul.ConsulException;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.cluster.ClusterModule;
 import org.apache.skywalking.oap.server.core.cluster.ClusterNodesQuery;
@@ -71,16 +72,20 @@ public class ClusterModuleConsulProvider extends ModuleProvider {
                 hostAndPorts.add(HostAndPort.fromParts(address.getHost(), address.getPort()));
             }
 
+            Consul.Builder consulBuilder = Consul.builder()
+//                    we should set this value or it will be blocked forever
+                    .withConnectTimeoutMillis(3000);
+
             if (hostAndPorts.size() > 1) {
-                client = Consul.builder().withMultipleHostAndPort(hostAndPorts, 5000).build();
+                client = consulBuilder.withMultipleHostAndPort(hostAndPorts, 5000).build();
             } else {
-                client = Consul.builder().withHostAndPort(hostAndPorts.get(0)).build();
+                client = consulBuilder.withHostAndPort(hostAndPorts.get(0)).build();
             }
-        } catch (ConnectStringParseException e) {
+        } catch (ConnectStringParseException | ConsulException e) {
             throw new ModuleStartException(e.getMessage(), e);
         }
 
-        ConsulCoordinator coordinator = new ConsulCoordinator(client, config.getServiceName());
+        ConsulCoordinator coordinator = new ConsulCoordinator(config, client);
         this.registerServiceImplementation(ClusterRegister.class, coordinator);
         this.registerServiceImplementation(ClusterNodesQuery.class, coordinator);
     }
