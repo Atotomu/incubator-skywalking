@@ -19,13 +19,13 @@
 package org.apache.skywalking.oap.server.core.analysis.manual.endpointrelation;
 
 import org.apache.skywalking.oap.server.core.analysis.SourceDispatcher;
-import org.apache.skywalking.oap.server.core.analysis.worker.IndicatorProcess;
+import org.apache.skywalking.oap.server.core.analysis.manual.endpoint.EndpointTraffic;
+import org.apache.skywalking.oap.server.core.analysis.worker.MetricsStreamProcessor;
+import org.apache.skywalking.oap.server.core.source.DetectPoint;
 import org.apache.skywalking.oap.server.core.source.EndpointRelation;
 
-/**
- * @author wusheng, peng-yongsheng
- */
 public class EndpointCallRelationDispatcher implements SourceDispatcher<EndpointRelation> {
+
     @Override
     public void dispatch(EndpointRelation source) {
         switch (source.getDetectPoint()) {
@@ -36,12 +36,14 @@ public class EndpointCallRelationDispatcher implements SourceDispatcher<Endpoint
     }
 
     private void serverSide(EndpointRelation source) {
-        EndpointRelationServerSideIndicator indicator = new EndpointRelationServerSideIndicator();
-        indicator.setTimeBucket(source.getTimeBucket());
-        indicator.setSourceEndpointId(source.getEndpointId());
-        indicator.setDestEndpointId(source.getChildEndpointId());
-        indicator.setComponentId(source.getComponentId());
-        indicator.setEntityId(source.getEntityId());
-        IndicatorProcess.INSTANCE.in(indicator);
+        EndpointRelationServerSideMetrics metrics = new EndpointRelationServerSideMetrics();
+        metrics.setTimeBucket(source.getTimeBucket());
+        metrics.setSourceEndpoint(
+            EndpointTraffic.buildId(source.getServiceId(), source.getEndpoint(), DetectPoint.SERVER));
+        metrics.setDestEndpoint(
+            EndpointTraffic.buildId(source.getChildServiceId(), source.getChildEndpoint(), DetectPoint.SERVER));
+        metrics.setComponentId(source.getComponentId());
+        metrics.setEntityId(source.getEntityId());
+        MetricsStreamProcessor.getInstance().in(metrics);
     }
 }

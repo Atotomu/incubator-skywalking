@@ -19,26 +19,26 @@
 package org.apache.skywalking.oap.server.core.analysis.manual.log;
 
 import org.apache.skywalking.oap.server.core.analysis.SourceDispatcher;
-import org.apache.skywalking.oap.server.core.analysis.worker.RecordProcess;
+import org.apache.skywalking.oap.server.core.analysis.worker.RecordStreamProcessor;
 import org.apache.skywalking.oap.server.core.source.HTTPAccessLog;
 
-/**
- * @author wusheng
- */
 public class HTTPAccessLogDispatcher implements SourceDispatcher<HTTPAccessLog> {
-    @Override public void dispatch(HTTPAccessLog source) {
+
+    @Override
+    public void dispatch(HTTPAccessLog source) {
         HTTPAccessLogRecord record = new HTTPAccessLogRecord();
         record.setTimestamp(source.getTimestamp());
         record.setTimeBucket(source.getTimeBucket());
         record.setServiceId(source.getServiceId());
         record.setServiceInstanceId(source.getServiceInstanceId());
         record.setEndpointId(source.getEndpointId());
+        record.setEndpointName(source.getEndpointName());
         record.setTraceId(source.getTraceId());
         record.setIsError(source.getIsError());
         record.setStatusCode(source.getStatusCode());
         record.setContentType(source.getContentType().value());
         record.setContent(source.getContent());
 
-        RecordProcess.INSTANCE.in(record);
+        RecordStreamProcessor.getInstance().in(record);
     }
 }

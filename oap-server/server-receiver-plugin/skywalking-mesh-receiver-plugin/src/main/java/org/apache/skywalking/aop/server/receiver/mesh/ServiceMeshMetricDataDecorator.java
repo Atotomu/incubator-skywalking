@@ -19,20 +19,16 @@
 package org.apache.skywalking.aop.server.receiver.mesh;
 
 import com.google.gson.JsonObject;
-import org.apache.skywalking.apm.network.common.DetectPoint;
 import org.apache.skywalking.apm.network.servicemesh.ServiceMeshMetric;
+import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.register.ServiceInstanceInventory;
 import org.apache.skywalking.oap.server.receiver.sharing.server.CoreRegisterLinker;
 
-/**
- * @author wusheng
- */
 public class ServiceMeshMetricDataDecorator {
     private ServiceMeshMetric origin;
     private ServiceMeshMetric rebuiltData;
     private ServiceMeshMetric.Builder newDataBuilder;
-    private int endpointId;
 
     public ServiceMeshMetricDataDecorator(ServiceMeshMetric origin) {
         this.origin = origin;
@@ -46,19 +42,28 @@ public class ServiceMeshMetricDataDecorator {
         boolean isRegistered = true;
         sourceServiceId = origin.getSourceServiceId();
         if (sourceServiceId == Const.NONE) {
-            sourceServiceId = CoreRegisterLinker.getServiceInventoryRegister().getOrCreate(origin.getSourceServiceName(), null);
-            if (sourceServiceId != Const.NONE) {
-                getNewDataBuilder().setSourceServiceId(sourceServiceId);
-            } else {
-                isRegistered = false;
+            String sourceServiceName = origin.getSourceServiceName();
+            // sourceServiceName is optional now,
+            // which means only generate dest service traffic.
+            if (!StringUtil.isEmpty(sourceServiceName)) {
+                sourceServiceId = CoreRegisterLinker.getServiceInventoryRegister().getOrCreate(sourceServiceName, null);
+                if (sourceServiceId != Const.NONE) {
+                    getNewDataBuilder().setSourceServiceId(sourceServiceId);
+                } else {
+                    isRegistered = false;
+                }
             }
+            // No service name, service instance will be ignored too.
         }
         sourceServiceInstanceId = origin.getSourceServiceInstanceId();
         if (sourceServiceId != Const.NONE && sourceServiceInstanceId == Const.NONE) {
             sourceServiceInstanceId = CoreRegisterLinker.getServiceInstanceInventoryRegister()
-                .getOrCreate(sourceServiceId, origin.getSourceServiceInstance(), origin.getSourceServiceInstance(),
-                    origin.getEndTime(),
-                    getOSInfoForMesh(origin.getSourceServiceInstance()));
+                                                        .getOrCreate(
+                                                            sourceServiceId, origin.getSourceServiceInstance(), origin
+                                                                .getSourceServiceInstance(), origin.getEndTime(),
+                                                            getOSInfoForMesh(origin
+                                                                                 .getSourceServiceInstance())
+                                                        );
             if (sourceServiceInstanceId != Const.NONE) {
                 getNewDataBuilder().setSourceServiceInstanceId(sourceServiceInstanceId);
             } else {
@@ -67,7 +72,8 @@ public class ServiceMeshMetricDataDecorator {
         }
         destServiceId = origin.getDestServiceId();
         if (destServiceId == Const.NONE) {
-            destServiceId = CoreRegisterLinker.getServiceInventoryRegister().getOrCreate(origin.getDestServiceName(), null);
+            destServiceId = CoreRegisterLinker.getServiceInventoryRegister()
+                                              .getOrCreate(origin.getDestServiceName(), null);
             if (destServiceId != Const.NONE) {
                 getNewDataBuilder().setDestServiceId(destServiceId);
             } else {
@@ -77,33 +83,17 @@ public class ServiceMeshMetricDataDecorator {
         destServiceInstanceId = origin.getDestServiceInstanceId();
         if (destServiceId != Const.NONE && destServiceInstanceId == Const.NONE) {
             destServiceInstanceId = CoreRegisterLinker.getServiceInstanceInventoryRegister()
-                .getOrCreate(destServiceId, origin.getDestServiceInstance(), origin.getDestServiceInstance(),
-                    origin.getEndTime(),
-                    getOSInfoForMesh(origin.getDestServiceInstance()));
+                                                      .getOrCreate(
+                                                          destServiceId, origin.getDestServiceInstance(), origin
+                                                              .getDestServiceInstance(), origin.getEndTime(),
+                                                          getOSInfoForMesh(origin
+                                                                               .getDestServiceInstance())
+                                                      );
             if (destServiceInstanceId != Const.NONE) {
                 getNewDataBuilder().setDestServiceInstanceId(destServiceInstanceId);
             } else {
                 isRegistered = false;
             }
-        }
-        String endpoint = origin.getEndpoint();
-
-        DetectPoint point = origin.getDetectPoint();
-        if (DetectPoint.client.equals(point)) {
-            if (sourceServiceId != Const.NONE) {
-                endpointId = CoreRegisterLinker.getEndpointInventoryRegister().getOrCreate(sourceServiceId, endpoint,
-                    org.apache.skywalking.oap.server.core.source.DetectPoint.fromNetworkProtocolDetectPoint(point));
-            }
-        } else {
-            if (destServiceId != Const.NONE) {
-                endpointId = CoreRegisterLinker.getEndpointInventoryRegister().getOrCreate(destServiceId, endpoint,
-                    org.apache.skywalking.oap.server.core.source.DetectPoint.fromNetworkProtocolDetectPoint(point));
-            }
-        }
-
-        if (endpointId != Const.NONE) {
-        } else {
-            isRegistered = false;
         }
 
         return isRegistered;
@@ -118,10 +108,6 @@ public class ServiceMeshMetricDataDecorator {
         } else {
             return origin;
         }
-    }
-
-    public int getEndpointId() {
-        return endpointId;
     }
 
     private ServiceMeshMetric.Builder getNewDataBuilder() {

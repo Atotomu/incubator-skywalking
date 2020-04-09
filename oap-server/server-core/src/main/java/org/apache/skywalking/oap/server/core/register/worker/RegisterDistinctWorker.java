@@ -18,19 +18,21 @@
 
 package org.apache.skywalking.oap.server.core.register.worker;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import org.apache.skywalking.apm.commons.datacarrier.DataCarrier;
-import org.apache.skywalking.apm.commons.datacarrier.consumer.*;
+import org.apache.skywalking.apm.commons.datacarrier.consumer.BulkConsumePool;
+import org.apache.skywalking.apm.commons.datacarrier.consumer.ConsumerPoolFactory;
+import org.apache.skywalking.apm.commons.datacarrier.consumer.IConsumer;
 import org.apache.skywalking.oap.server.core.UnexpectedException;
-import org.apache.skywalking.oap.server.core.analysis.data.EndOfBatchContext;
 import org.apache.skywalking.oap.server.core.register.RegisterSource;
 import org.apache.skywalking.oap.server.core.worker.AbstractWorker;
 import org.apache.skywalking.oap.server.library.module.ModuleDefineHolder;
-import org.slf4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * @author peng-yongsheng
- */
 public class RegisterDistinctWorker extends AbstractWorker<RegisterSource> {
 
     private static final Logger logger = LoggerFactory.getLogger(RegisterDistinctWorker.class);
@@ -59,8 +61,9 @@ public class RegisterDistinctWorker extends AbstractWorker<RegisterSource> {
         this.dataCarrier.consume(ConsumerPoolFactory.INSTANCE.get(name), new AggregatorConsumer(this));
     }
 
-    @Override public final void in(RegisterSource source) {
-        source.setEndOfBatchContext(new EndOfBatchContext(false));
+    @Override
+    public final void in(RegisterSource source) {
+        source.resetEndOfBatch();
         dataCarrier.produce(source);
     }
 
@@ -73,7 +76,7 @@ public class RegisterDistinctWorker extends AbstractWorker<RegisterSource> {
             sources.get(source).combine(source);
         }
 
-        if (messageNum >= 1000 || source.getEndOfBatchContext().isEndOfBatch()) {
+        if (messageNum >= 1000 || source.isEndOfBatch()) {
             sources.values().forEach(nextWorker::in);
             sources.clear();
             messageNum = 0;
@@ -88,10 +91,12 @@ public class RegisterDistinctWorker extends AbstractWorker<RegisterSource> {
             this.aggregator = aggregator;
         }
 
-        @Override public void init() {
+        @Override
+        public void init() {
         }
 
-        @Override public void consume(List<RegisterSource> sources) {
+        @Override
+        public void consume(List<RegisterSource> sources) {
             Iterator<RegisterSource> sourceIterator = sources.iterator();
 
             int i = 0;
@@ -99,17 +104,19 @@ public class RegisterDistinctWorker extends AbstractWorker<RegisterSource> {
                 RegisterSource source = sourceIterator.next();
                 i++;
                 if (i == sources.size()) {
-                    source.getEndOfBatchContext().setEndOfBatch(true);
+                    source.asEndOfBatch();
                 }
                 aggregator.onWork(source);
             }
         }
 
-        @Override public void onError(List<RegisterSource> sources, Throwable t) {
+        @Override
+        public void onError(List<RegisterSource> sources, Throwable t) {
             logger.error(t.getMessage(), t);
         }
 
-        @Override public void onExit() {
+        @Override
+        public void onExit() {
         }
     }
 }

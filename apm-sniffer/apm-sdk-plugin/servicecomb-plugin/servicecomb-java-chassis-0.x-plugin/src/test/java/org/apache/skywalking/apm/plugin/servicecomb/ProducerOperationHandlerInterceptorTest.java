@@ -102,7 +102,7 @@ public class ProducerOperationHandlerInterceptorTest {
         when(invocation.getInvocationType()).thenReturn(InvocationType.PRODUCER);
         Config.Agent.SERVICE_NAME = "serviceComnTestCases-APP";
 
-        allArguments = new Object[] {invocation,};
+        allArguments = new Object[] {invocation};
         argumentsType = new Class[] {};
         swaggerArguments = new Class[] {};
 
@@ -119,7 +119,7 @@ public class ProducerOperationHandlerInterceptorTest {
 
         List<AbstractTracingSpan> spans = SegmentHelper.getSpans(traceSegment);
         assertCombSpan(spans.get(0));
-        verify(invocation, times(1)).getContext();
+        verify(invocation, times(2)).getContext();
     }
 
     private void assertCombSpan(AbstractTracingSpan span) {

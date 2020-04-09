@@ -18,6 +18,10 @@
 
 package org.apache.skywalking.oap.server.core.alarm.provider;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.skywalking.oap.server.core.alarm.AlarmCallback;
 import org.apache.skywalking.oap.server.core.alarm.AlarmMessage;
 import org.joda.time.LocalDateTime;
@@ -25,40 +29,22 @@ import org.joda.time.Minutes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 /**
- * Alarm core includes metric values in certain time windows based on alarm settings. By using its internal timer
+ * Alarm core includes metrics values in certain time windows based on alarm settings. By using its internal timer
  * trigger and the alarm rules to decides whether send the alarm to database and webhook(s)
- *
- * @author wusheng
  */
 public class AlarmCore {
     private static final Logger logger = LoggerFactory.getLogger(AlarmCore.class);
 
-    private Map<String, List<RunningRule>> runningContext;
     private LocalDateTime lastExecuteTime;
+    private AlarmRulesWatcher alarmRulesWatcher;
 
-    AlarmCore(Rules rules) {
-        runningContext = new HashMap<>();
-        rules.getRules().forEach(rule -> {
-            RunningRule runningRule = new RunningRule(rule);
-
-            String indicatorName = rule.getIndicatorName();
-
-            List<RunningRule> runningRules = runningContext.computeIfAbsent(indicatorName, key -> new ArrayList<>());
-
-            runningRules.add(runningRule);
-        });
+    AlarmCore(AlarmRulesWatcher alarmRulesWatcher) {
+        this.alarmRulesWatcher = alarmRulesWatcher;
     }
 
-    public List<RunningRule> findRunningRule(String indicatorName) {
-        return runningContext.get(indicatorName);
+    public List<RunningRule> findRunningRule(String metricsName) {
+        return alarmRulesWatcher.getRunningContext().get(metricsName);
     }
 
     public void start(List<AlarmCallback> allCallbacks) {
@@ -69,11 +55,11 @@ public class AlarmCore {
                 List<AlarmMessage> alarmMessageList = new ArrayList<>(30);
                 LocalDateTime checkTime = LocalDateTime.now();
                 int minutes = Minutes.minutesBetween(lastExecuteTime, checkTime).getMinutes();
-                boolean[] hasExecute = new boolean[]{false};
-                runningContext.values().forEach(ruleList -> ruleList.forEach(runningRule -> {
+                boolean[] hasExecute = new boolean[] {false};
+                alarmRulesWatcher.getRunningContext().values().forEach(ruleList -> ruleList.forEach(runningRule -> {
                     if (minutes > 0) {
                         runningRule.moveTo(checkTime);
-                        /**
+                        /*
                          * Don't run in the first quarter per min, avoid to trigger false alarm.
                          */
                         if (checkTime.getSecondOfMinute() > 15) {

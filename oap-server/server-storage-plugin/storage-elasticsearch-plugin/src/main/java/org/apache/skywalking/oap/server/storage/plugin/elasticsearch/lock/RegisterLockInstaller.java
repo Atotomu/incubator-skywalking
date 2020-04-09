@@ -18,24 +18,25 @@
 
 package org.apache.skywalking.oap.server.storage.plugin.elasticsearch.lock;
 
-import com.google.gson.JsonObject;
-import java.io.IOException;
-import org.apache.skywalking.oap.server.core.register.worker.InventoryProcess;
+import org.apache.skywalking.oap.server.core.analysis.Stream;
+import org.apache.skywalking.oap.server.core.register.worker.InventoryStreamProcessor;
 import org.apache.skywalking.oap.server.core.storage.StorageException;
-import org.apache.skywalking.oap.server.core.storage.annotation.StorageEntityAnnotationUtils;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSearchClient;
 import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.common.xcontent.*;
-import org.slf4j.*;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * @author peng-yongsheng
- */
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 public class RegisterLockInstaller {
 
     private static final Logger logger = LoggerFactory.getLogger(RegisterLockInstaller.class);
 
-    private final ElasticSearchClient client;
+    protected final ElasticSearchClient client;
 
     public RegisterLockInstaller(ElasticSearchClient client) {
         this.client = client;
@@ -54,9 +55,9 @@ public class RegisterLockInstaller {
                 createIndex();
             }
 
-            for (Class registerSource : InventoryProcess.INSTANCE.getAllRegisterSources()) {
-                int sourceScopeId = StorageEntityAnnotationUtils.getSourceScope(registerSource);
-                putIfAbsent(sourceScopeId);
+            for (Class registerSource : InventoryStreamProcessor.getInstance().getAllRegisterSources()) {
+                int scopeId = ((Stream) registerSource.getAnnotation(Stream.class)).scopeId();
+                putIfAbsent(scopeId);
             }
         } catch (IOException e) {
             throw new StorageException(e.getMessage());
@@ -64,26 +65,26 @@ public class RegisterLockInstaller {
     }
 
     private void deleteIndex() throws IOException {
-        client.deleteIndex(RegisterLockIndex.NAME);
+        client.deleteByModelName(RegisterLockIndex.NAME);
     }
 
-    private void createIndex() throws IOException {
-        JsonObject settings = new JsonObject();
-        settings.addProperty("index.number_of_shards", 1);
-        settings.addProperty("index.number_of_replicas", 0);
-        settings.addProperty("index.refresh_interval", "1s");
+    protected void createIndex() throws IOException {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("index.number_of_shards", 1);
+        settings.put("index.number_of_replicas", 0);
+        settings.put("index.refresh_interval", "1s");
 
-        JsonObject mapping = new JsonObject();
-        mapping.add(ElasticSearchClient.TYPE, new JsonObject());
+        Map<String, Object> mapping = new HashMap<>();
+        Map<String, Object> type = new HashMap<>();
 
-        JsonObject type = mapping.get(ElasticSearchClient.TYPE).getAsJsonObject();
+        mapping.put(ElasticSearchClient.TYPE, type);
 
-        JsonObject properties = new JsonObject();
-        type.add("properties", properties);
+        Map<String, Object> properties = new HashMap<>();
+        type.put("properties", properties);
 
-        JsonObject column = new JsonObject();
-        column.addProperty("type", "integer");
-        properties.add(RegisterLockIndex.COLUMN_SEQUENCE, column);
+        Map<String, Object> column = new HashMap<>();
+        column.put("type", "integer");
+        properties.put(RegisterLockIndex.COLUMN_SEQUENCE, column);
 
         client.createIndex(RegisterLockIndex.NAME, settings, mapping);
     }

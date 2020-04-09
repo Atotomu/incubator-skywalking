@@ -21,16 +21,22 @@ package org.apache.skywalking.oap.query.graphql.resolver;
 import com.coxautodev.graphql.tools.GraphQLQueryResolver;
 import java.io.IOException;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import org.apache.skywalking.oap.query.graphql.type.Duration;
+import org.apache.skywalking.oap.query.graphql.type.TimeInfo;
 import org.apache.skywalking.oap.server.core.CoreModule;
-import org.apache.skywalking.oap.server.core.query.*;
-import org.apache.skywalking.oap.server.core.query.entity.*;
+import org.apache.skywalking.oap.server.core.query.DurationUtils;
+import org.apache.skywalking.oap.server.core.query.MetadataQueryService;
+import org.apache.skywalking.oap.server.core.query.entity.ClusterBrief;
+import org.apache.skywalking.oap.server.core.query.entity.Database;
+import org.apache.skywalking.oap.server.core.query.entity.Endpoint;
+import org.apache.skywalking.oap.server.core.query.entity.EndpointInfo;
+import org.apache.skywalking.oap.server.core.query.entity.Service;
+import org.apache.skywalking.oap.server.core.query.entity.ServiceInstance;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 
-/**
- * @author peng-yongsheng
- */
 public class MetadataQuery implements GraphQLQueryResolver {
 
     private final ModuleManager moduleManager;
@@ -42,7 +48,9 @@ public class MetadataQuery implements GraphQLQueryResolver {
 
     private MetadataQueryService getMetadataQueryService() {
         if (metadataQueryService == null) {
-            this.metadataQueryService = moduleManager.find(CoreModule.NAME).provider().getService(MetadataQueryService.class);
+            this.metadataQueryService = moduleManager.find(CoreModule.NAME)
+                                                     .provider()
+                                                     .getService(MetadataQueryService.class);
         }
         return metadataQueryService;
     }
@@ -61,8 +69,15 @@ public class MetadataQuery implements GraphQLQueryResolver {
         return getMetadataQueryService().getAllServices(startTimestamp, endTimestamp);
     }
 
-    public List<Service> searchServices(final Duration duration, final String keyword)
-        throws IOException, ParseException {
+    public List<Service> getAllBrowserServices(final Duration duration) throws IOException, ParseException {
+        long startTimestamp = DurationUtils.INSTANCE.startTimeToTimestamp(duration.getStep(), duration.getStart());
+        long endTimestamp = DurationUtils.INSTANCE.endTimeToTimestamp(duration.getStep(), duration.getEnd());
+
+        return getMetadataQueryService().getAllBrowserServices(startTimestamp, endTimestamp);
+    }
+
+    public List<Service> searchServices(final Duration duration,
+                                        final String keyword) throws IOException, ParseException {
         long startTimestamp = DurationUtils.INSTANCE.startTimeToTimestamp(duration.getStep(), duration.getStart());
         long endTimestamp = DurationUtils.INSTANCE.endTimeToTimestamp(duration.getStep(), duration.getEnd());
 
@@ -74,23 +89,32 @@ public class MetadataQuery implements GraphQLQueryResolver {
     }
 
     public List<ServiceInstance> getServiceInstances(final Duration duration,
-        final String serviceId) throws IOException, ParseException {
+                                                     final String serviceId) throws IOException, ParseException {
         long startTimestamp = DurationUtils.INSTANCE.startTimeToTimestamp(duration.getStep(), duration.getStart());
         long endTimestamp = DurationUtils.INSTANCE.endTimeToTimestamp(duration.getStep(), duration.getEnd());
 
         return getMetadataQueryService().getServiceInstances(startTimestamp, endTimestamp, serviceId);
     }
 
-    public List<Endpoint> searchEndpoint(final String keyword, final String serviceId,
-        final int limit) throws IOException {
+    public List<Endpoint> searchEndpoint(final String keyword, final int serviceId,
+                                         final int limit) throws IOException {
         return getMetadataQueryService().searchEndpoint(keyword, serviceId, limit);
     }
 
-    public EndpointInfo getEndpointInfo(final int endpointId) throws IOException {
+    public EndpointInfo getEndpointInfo(final String endpointId) throws IOException {
         return getMetadataQueryService().getEndpointInfo(endpointId);
     }
 
     public List<Database> getAllDatabases(final Duration duration) throws IOException {
         return getMetadataQueryService().getAllDatabases();
+    }
+
+    public TimeInfo getTimeInfo() {
+        TimeInfo timeInfo = new TimeInfo();
+        SimpleDateFormat timezoneFormat = new SimpleDateFormat("ZZZZZZ");
+        Date date = new Date();
+        timeInfo.setCurrentTimestamp(date.getTime());
+        timeInfo.setTimezone(timezoneFormat.format(date));
+        return timeInfo;
     }
 }
