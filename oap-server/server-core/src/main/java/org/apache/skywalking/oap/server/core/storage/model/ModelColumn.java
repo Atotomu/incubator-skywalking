@@ -18,8 +18,9 @@
 
 package org.apache.skywalking.oap.server.core.storage.model;
 
+import com.google.gson.JsonObject;
 import lombok.Getter;
-import org.apache.skywalking.oap.server.core.analysis.metrics.IntKeyLongValueHashMap;
+import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 
 @Getter
 public class ModelColumn {
@@ -40,17 +41,17 @@ public class ModelColumn {
         this.matchQuery = matchQuery;
 
         /*
-         * Only accept length in the String definition.
+         * Only accept length in the String/JsonObject definition.
          */
-        if (!type.equals(String.class)) {
-            this.length = 0;
-        } else {
+        if (type.equals(String.class) || type.equals(JsonObject.class)) {
             this.length = length;
+        } else {
+            this.length = 0;
         }
         /*
          * byte[] and {@link IntKeyLongValueHashMap} could never be query.
          */
-        if (type.equals(byte[].class) || type.equals(IntKeyLongValueHashMap.class)) {
+        if (type.equals(byte[].class) || type.equals(DataTable.class)) {
             this.storageOnly = true;
         } else {
             if (storageOnly && isValue) {

@@ -30,8 +30,8 @@ import org.apache.skywalking.apm.agent.core.context.util.KeyValuePair;
 import org.apache.skywalking.apm.agent.core.context.util.TagValuePair;
 import org.apache.skywalking.apm.agent.core.context.util.ThrowableTransformer;
 import org.apache.skywalking.apm.agent.core.dictionary.DictionaryUtil;
-import org.apache.skywalking.apm.network.language.agent.SpanType;
-import org.apache.skywalking.apm.network.language.agent.v2.SpanObjectV2;
+import org.apache.skywalking.apm.network.language.agent.v3.SpanObject;
+import org.apache.skywalking.apm.network.language.agent.v3.SpanType;
 import org.apache.skywalking.apm.network.trace.component.Component;
 
 /**
@@ -73,8 +73,6 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
 
     protected int componentId = 0;
 
-    protected String componentName;
-
     /**
      * Log is a concept from OpenTracing spec. https://github.com/opentracing/specification/blob/master/specification.md#log-structured-data
      */
@@ -86,6 +84,11 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
      * we use this {@link #refs} to link them.
      */
     protected List<TraceSegmentRef> refs;
+
+    /**
+     * Tracing Mode. If true means represents all spans generated in this context should skip analysis.
+     */
+    protected boolean skipAnalysis;
 
     protected AbstractTracingSpan(int spanId, int parentSpanId, String operationName, TracingContext owner) {
         this.operationName = operationName;
@@ -234,31 +237,21 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
         return this;
     }
 
-    /**
-     * Set the component name. By using this, cost more memory and network.
-     *
-     * @return span instance, for chaining.
-     */
-    @Override
-    public AbstractTracingSpan setComponent(String componentName) {
-        this.componentName = componentName;
-        return this;
-    }
-
     @Override
     public AbstractSpan start(long startTime) {
         this.startTime = startTime;
         return this;
     }
 
-    public SpanObjectV2.Builder transform() {
-        SpanObjectV2.Builder spanBuilder = SpanObjectV2.newBuilder();
+    public SpanObject.Builder transform() {
+        SpanObject.Builder spanBuilder = SpanObject.newBuilder();
 
         spanBuilder.setSpanId(this.spanId);
         spanBuilder.setParentSpanId(parentSpanId);
         spanBuilder.setStartTime(startTime);
         spanBuilder.setEndTime(endTime);
         spanBuilder.setOperationName(operationName);
+        spanBuilder.setSkipAnalysis(skipAnalysis);
         if (isEntry()) {
             spanBuilder.setSpanType(SpanType.Entry);
         } else if (isExit()) {
@@ -271,10 +264,6 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
         }
         if (componentId != DictionaryUtil.nullValue()) {
             spanBuilder.setComponentId(componentId);
-        } else {
-            if (componentName != null) {
-                spanBuilder.setComponent(componentName);
-            }
         }
         spanBuilder.setIsError(errorOccurred);
         if (this.tags != null) {
@@ -322,7 +311,7 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
             throw new RuntimeException("Span is not in async mode, please use '#prepareForAsync' to active.");
         }
         if (isAsyncStopped) {
-            throw new RuntimeException("Can not do async finish for the span repeately.");
+            throw new RuntimeException("Can not do async finish for the span repeatedly.");
         }
         this.endTime = System.currentTimeMillis();
         owner.asyncStop(this);
@@ -333,5 +322,10 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
     @Override
     public boolean isProfiling() {
         return this.owner.profileStatus().isProfiling();
+    }
+
+    @Override
+    public void skipAnalysis() {
+        this.skipAnalysis = true;
     }
 }

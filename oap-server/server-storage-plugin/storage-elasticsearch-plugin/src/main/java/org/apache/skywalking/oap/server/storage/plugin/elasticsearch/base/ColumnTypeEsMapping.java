@@ -18,14 +18,16 @@
 
 package org.apache.skywalking.oap.server.storage.plugin.elasticsearch.base;
 
-import org.apache.skywalking.oap.server.core.analysis.metrics.IntKeyLongValueHashMap;
+import com.google.gson.JsonObject;
+import org.apache.skywalking.oap.server.core.analysis.NodeType;
 import org.apache.skywalking.oap.server.core.storage.model.DataTypeMapping;
+import org.apache.skywalking.oap.server.core.storage.type.StorageDataComplexObject;
 
 public class ColumnTypeEsMapping implements DataTypeMapping {
 
     @Override
     public String transform(Class<?> type) {
-        if (Integer.class.equals(type) || int.class.equals(type)) {
+        if (Integer.class.equals(type) || int.class.equals(type) || NodeType.class.equals(type)) {
             return "integer";
         } else if (Long.class.equals(type) || long.class.equals(type)) {
             return "long";
@@ -33,10 +35,12 @@ public class ColumnTypeEsMapping implements DataTypeMapping {
             return "double";
         } else if (String.class.equals(type)) {
             return "keyword";
-        } else if (IntKeyLongValueHashMap.class.equals(type)) {
+        } else if (StorageDataComplexObject.class.isAssignableFrom(type)) {
             return "text";
         } else if (byte[].class.equals(type)) {
             return "binary";
+        } else if (JsonObject.class.equals(type)) {
+            return "text";
         } else {
             throw new IllegalArgumentException("Unsupported data type: " + type.getName());
         }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.skywalking.oap.server.core.annotation.AnnotationScan;
 import org.apache.skywalking.oap.server.core.source.DefaultScopeDefine;
+import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -29,7 +30,7 @@ import org.junit.Test;
 
 public class DeepAnalysisTest {
     @BeforeClass
-    public static void init() throws IOException {
+    public static void init() throws IOException, StorageException {
         AnnotationScan scopeScan = new AnnotationScan();
         scopeScan.registerListener(new DefaultScopeDefine.Listener());
         scopeScan.scan();
@@ -84,7 +85,7 @@ public class DeepAnalysisTest {
         Assert.assertEquals("(long)(1)", method.getArgsExpressions().get(1));
 
         List<SourceColumn> source = result.getFieldsFromSource();
-        Assert.assertEquals(3, source.size());
+        Assert.assertEquals(2, source.size());
 
         List<DataColumn> persistentFields = result.getPersistentFields();
         Assert.assertEquals(4, persistentFields.size());
@@ -113,7 +114,7 @@ public class DeepAnalysisTest {
         Assert.assertEquals("(long)(1)", method.getArgsExpressions().get(1));
 
         List<SourceColumn> source = result.getFieldsFromSource();
-        Assert.assertEquals(3, source.size());
+        Assert.assertEquals(2, source.size());
 
         List<DataColumn> persistentFields = result.getPersistentFields();
         Assert.assertEquals(4, persistentFields.size());

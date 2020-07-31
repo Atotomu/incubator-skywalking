@@ -19,13 +19,13 @@
 package org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao;
 
 import org.apache.skywalking.oap.server.core.analysis.config.NoneStream;
+import org.apache.skywalking.oap.server.core.analysis.management.ManagementData;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
 import org.apache.skywalking.oap.server.core.analysis.record.Record;
-import org.apache.skywalking.oap.server.core.register.RegisterSource;
+import org.apache.skywalking.oap.server.core.storage.IManagementDAO;
 import org.apache.skywalking.oap.server.core.storage.IMetricsDAO;
 import org.apache.skywalking.oap.server.core.storage.INoneStreamDAO;
 import org.apache.skywalking.oap.server.core.storage.IRecordDAO;
-import org.apache.skywalking.oap.server.core.storage.IRegisterDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageBuilder;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
 import org.apache.skywalking.oap.server.library.client.jdbc.hikaricp.JDBCHikariCPClient;
@@ -44,11 +44,6 @@ public class H2StorageDAO implements StorageDAO {
     }
 
     @Override
-    public IRegisterDAO newRegisterDao(StorageBuilder<RegisterSource> storageBuilder) {
-        return new H2RegisterDAO(h2Client, storageBuilder);
-    }
-
-    @Override
     public IRecordDAO newRecordDao(StorageBuilder<Record> storageBuilder) {
         return new H2RecordDAO(h2Client, storageBuilder);
     }
@@ -56,5 +51,10 @@ public class H2StorageDAO implements StorageDAO {
     @Override
     public INoneStreamDAO newNoneStreamDao(StorageBuilder<NoneStream> storageBuilder) {
         return new H2NoneStreamDAO(h2Client, storageBuilder);
+    }
+
+    @Override
+    public IManagementDAO newManagementDao(final StorageBuilder<ManagementData> storageBuilder) {
+        return new H2ManagementDAO(h2Client, storageBuilder);
     }
 }
