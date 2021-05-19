@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+
 import org.apache.skywalking.oap.server.configuration.api.ConfigChangeWatcher;
 import org.apache.skywalking.oap.server.library.util.ResourceUtils;
 import org.junit.Before;
@@ -60,6 +62,9 @@ public class AlarmRulesWatcherTest {
                                                                        .op(">")
                                                                        .period(1)
                                                                        .silencePeriod(2)
+                                                                       .tags(new HashMap<String, String>() {{
+                                                                           put("key", "value");
+                                                                       }})
                                                                        .threshold("2");
 
     @Before
@@ -77,11 +82,15 @@ public class AlarmRulesWatcherTest {
 
         alarmRulesWatcher.notify(new ConfigChangeWatcher.ConfigChangeEvent(new String(chars, 0, length), ConfigChangeWatcher.EventType.MODIFY));
 
-        assertEquals(2, alarmRulesWatcher.getRules().size());
+        assertEquals(3, alarmRulesWatcher.getRules().size());
         assertEquals(2, alarmRulesWatcher.getWebHooks().size());
         assertNotNull(alarmRulesWatcher.getGrpchookSetting());
         assertEquals(9888, alarmRulesWatcher.getGrpchookSetting().getTargetPort());
         assertEquals(2, alarmRulesWatcher.getRunningContext().size());
+        assertNotNull(alarmRulesWatcher.getDingtalkSettings());
+        assertNotNull(alarmRulesWatcher.getWechatSettings());
+        assertNotNull(alarmRulesWatcher.getSlackSettings());
+        assertNotNull(alarmRulesWatcher.getWeLinkSettings());
     }
 
     @Test

@@ -20,6 +20,9 @@ package org.apache.skywalking.oap.server.core.alarm;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.skywalking.oap.server.core.analysis.manual.searchtag.Tag;
+
+import java.util.List;
 
 /**
  * Alarm message represents the details of each alarm.
@@ -27,9 +30,6 @@ import lombok.Setter;
 @Setter
 @Getter
 public class AlarmMessage {
-
-    public static AlarmMessage NONE = new NoAlarm();
-
     private int scopeId;
     private String scope;
     private String name;
@@ -37,9 +37,8 @@ public class AlarmMessage {
     private String id1;
     private String ruleName;
     private String alarmMessage;
+    private List<Tag> tags;
     private long startTime;
-
-    private static class NoAlarm extends AlarmMessage {
-
-    }
+    private transient int period;
+    private transient boolean onlyAsCondition;
 }

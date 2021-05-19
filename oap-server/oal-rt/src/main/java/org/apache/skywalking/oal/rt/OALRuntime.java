@@ -53,7 +53,6 @@ import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oal.rt.output.AllDispatcherContext;
 import org.apache.skywalking.oal.rt.output.DispatcherContext;
 import org.apache.skywalking.oal.rt.parser.AnalysisResult;
-import org.apache.skywalking.oal.rt.parser.MetricsHolder;
 import org.apache.skywalking.oal.rt.parser.OALScripts;
 import org.apache.skywalking.oal.rt.parser.ScriptParser;
 import org.apache.skywalking.oal.rt.parser.SourceColumn;
@@ -66,6 +65,7 @@ import org.apache.skywalking.oap.server.core.analysis.StreamAnnotationListener;
 import org.apache.skywalking.oap.server.core.oal.rt.OALCompileException;
 import org.apache.skywalking.oap.server.core.oal.rt.OALDefine;
 import org.apache.skywalking.oap.server.core.oal.rt.OALEngine;
+import org.apache.skywalking.oap.server.core.storage.StorageBuilderFactory;
 import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.apache.skywalking.oap.server.core.storage.annotation.Column;
 import org.apache.skywalking.oap.server.library.module.ModuleStartException;
@@ -81,7 +81,6 @@ public class OALRuntime implements OALEngine {
     private static final String CLASS_FILE_CHARSET = "UTF-8";
     private static final String METRICS_FUNCTION_PACKAGE = "org.apache.skywalking.oap.server.core.analysis.metrics.";
     private static final String WITH_METADATA_INTERFACE = "org.apache.skywalking.oap.server.core.analysis.metrics.WithMetadata";
-    private static final String STORAGE_BUILDER_INTERFACE = "org.apache.skywalking.oap.server.core.storage.StorageBuilder";
     private static final String DISPATCHER_INTERFACE = "org.apache.skywalking.oap.server.core.analysis.SourceDispatcher";
     private static final String METRICS_STREAM_PROCESSOR = "org.apache.skywalking.oap.server.core.analysis.worker.MetricsStreamProcessor";
     private static final String[] METRICS_CLASS_METHODS = {
@@ -96,8 +95,8 @@ public class OALRuntime implements OALEngine {
         "toDay"
     };
     private static final String[] METRICS_BUILDER_CLASS_METHODS = {
-        "data2Map",
-        "map2Data"
+        "entity2Storage",
+        "storage2Entity"
     };
     private static boolean IS_RT_TEMP_FOLDER_INIT_COMPLETED = false;
 
@@ -108,6 +107,7 @@ public class OALRuntime implements OALEngine {
     private AllDispatcherContext allDispatcherContext;
     private StreamAnnotationListener streamAnnotationListener;
     private DispatcherDetectorListener dispatcherDetectorListener;
+    private StorageBuilderFactory storageBuilderFactory;
     private final List<Class> metricsClasses;
     private final List<Class> dispatcherClasses;
     private final boolean openEngineDebug;
@@ -135,6 +135,11 @@ public class OALRuntime implements OALEngine {
     }
 
     @Override
+    public void setStorageBuilderFactory(final StorageBuilderFactory factory) {
+        storageBuilderFactory = factory;
+    }
+
+    @Override
     public void start(ClassLoader currentClassLoader) throws ModuleStartException, OALCompileException {
         if (!IS_RT_TEMP_FOLDER_INIT_COMPLETED) {
             prepareRTTempFolder();
@@ -143,12 +148,6 @@ public class OALRuntime implements OALEngine {
 
         this.currentClassLoader = currentClassLoader;
         Reader read;
-
-        try {
-            MetricsHolder.init();
-        } catch (IOException e) {
-            throw new ModuleStartException("load metrics functions error.", e);
-        }
 
         try {
             read = ResourceUtils.read(oalDefine.getConfigFile());
@@ -325,7 +324,7 @@ public class OALRuntime implements OALEngine {
         String className = metricsBuilderClassName(metricsStmt, false);
         CtClass metricsBuilderClass = classPool.makeClass(metricsBuilderClassName(metricsStmt, true));
         try {
-            metricsBuilderClass.addInterface(classPool.get(STORAGE_BUILDER_INTERFACE));
+            metricsBuilderClass.addInterface(classPool.get(storageBuilderFactory.builderTemplate().getSuperClass()));
         } catch (NotFoundException e) {
             log.error("Can't find StorageBuilder interface for " + className + ".", e);
             throw new OALCompileException(e.getMessage(), e);
@@ -349,7 +348,9 @@ public class OALRuntime implements OALEngine {
         for (String method : METRICS_BUILDER_CLASS_METHODS) {
             StringWriter methodEntity = new StringWriter();
             try {
-                configuration.getTemplate("metrics-builder/" + method + ".ftl").process(metricsStmt, methodEntity);
+                configuration
+                    .getTemplate(storageBuilderFactory.builderTemplate().getTemplatePath() + "/" + method + ".ftl")
+                    .process(metricsStmt, methodEntity);
                 metricsBuilderClass.addMethod(CtNewMethod.make(methodEntity.toString(), metricsBuilderClass));
             } catch (Exception e) {
                 log.error("Can't generate method " + method + " for " + className + ".", e);

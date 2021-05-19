@@ -39,7 +39,7 @@ import org.powermock.modules.junit4.PowerMockRunner;
 import org.yaml.snakeyaml.Yaml;
 
 @RunWith(PowerMockRunner.class)
-@PowerMockIgnore("javax.management.*")
+@PowerMockIgnore({"com.sun.org.apache.xerces.*", "javax.xml.*", "org.xml.*", "javax.management.*", "org.w3c.*"})
 @PrepareForTest({ConfigurationConfigmapInformer.class})
 public class ConfigmapConfigWatcherRegisterTest {
 
@@ -55,6 +55,19 @@ public class ConfigmapConfigWatcherRegisterTest {
         settings.setPeriod(60);
         informer = PowerMockito.mock(ConfigurationConfigmapInformer.class);
         register = new ConfigmapConfigurationWatcherRegister(settings, informer);
+    }
+
+    @Test
+    public void readConfigWhenConfigMapDataIsNull() throws Exception {
+        V1ConfigMap v1ConfigMap = new V1ConfigMap();
+        PowerMockito.doReturn(Optional.of(v1ConfigMap)).when(informer).configMap();
+        Optional<ConfigTable> optionalConfigTable = register.readConfig(new HashSet<String>() {{
+            add("key1");
+        }});
+
+        Assert.assertTrue(optionalConfigTable.isPresent());
+        ConfigTable configTable = optionalConfigTable.get();
+        Assert.assertEquals(configTable.getItems().size(), 0);
     }
 
     @Test

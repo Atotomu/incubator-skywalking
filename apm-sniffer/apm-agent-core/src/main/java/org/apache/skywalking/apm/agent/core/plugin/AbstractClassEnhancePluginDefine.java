@@ -27,7 +27,10 @@ import org.apache.skywalking.apm.agent.core.plugin.interceptor.InstanceMethodsIn
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.StaticMethodsInterceptPoint;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.ClassEnhancePluginDefine;
 import org.apache.skywalking.apm.agent.core.plugin.match.ClassMatch;
+import org.apache.skywalking.apm.agent.core.util.CollectionUtil;
 import org.apache.skywalking.apm.util.StringUtil;
+
+import java.util.List;
 
 /**
  * Basic abstract class of all sky-walking auto-instrumentation plugins.
@@ -36,7 +39,7 @@ import org.apache.skywalking.apm.util.StringUtil;
  * {@link ClassEnhancePluginDefine}
  */
 public abstract class AbstractClassEnhancePluginDefine {
-    private static final ILog logger = LogManager.getLogger(AbstractClassEnhancePluginDefine.class);
+    private static final ILog LOGGER = LogManager.getLogger(AbstractClassEnhancePluginDefine.class);
 
     /**
      * Main entrance of enhancing the class.
@@ -52,20 +55,29 @@ public abstract class AbstractClassEnhancePluginDefine {
         String interceptorDefineClassName = this.getClass().getName();
         String transformClassName = typeDescription.getTypeName();
         if (StringUtil.isEmpty(transformClassName)) {
-            logger.warn("classname of being intercepted is not defined by {}.", interceptorDefineClassName);
+            LOGGER.warn("classname of being intercepted is not defined by {}.", interceptorDefineClassName);
             return null;
         }
 
-        logger.debug("prepare to enhance class {} by {}.", transformClassName, interceptorDefineClassName);
-
+        LOGGER.debug("prepare to enhance class {} by {}.", transformClassName, interceptorDefineClassName);
+        WitnessFinder finder = WitnessFinder.INSTANCE;
         /**
          * find witness classes for enhance class
          */
         String[] witnessClasses = witnessClasses();
         if (witnessClasses != null) {
             for (String witnessClass : witnessClasses) {
-                if (!WitnessClassFinder.INSTANCE.exist(witnessClass, classLoader)) {
-                    logger.warn("enhance class {} by plugin {} is not working. Because witness class {} is not existed.", transformClassName, interceptorDefineClassName, witnessClass);
+                if (!finder.exist(witnessClass, classLoader)) {
+                    LOGGER.warn("enhance class {} by plugin {} is not working. Because witness class {} is not existed.", transformClassName, interceptorDefineClassName, witnessClass);
+                    return null;
+                }
+            }
+        }
+        List<WitnessMethod> witnessMethods = witnessMethods();
+        if (!CollectionUtil.isEmpty(witnessMethods)) {
+            for (WitnessMethod witnessMethod : witnessMethods) {
+                if (!finder.exist(witnessMethod, classLoader)) {
+                    LOGGER.warn("enhance class {} by plugin {} is not working. Because witness method {} is not existed.", transformClassName, interceptorDefineClassName, witnessMethod);
                     return null;
                 }
             }
@@ -77,7 +89,7 @@ public abstract class AbstractClassEnhancePluginDefine {
         DynamicType.Builder<?> newClassBuilder = this.enhance(typeDescription, builder, classLoader, context);
 
         context.initializationStageCompleted();
-        logger.debug("enhance class {} by {} completely.", transformClassName, interceptorDefineClassName);
+        LOGGER.debug("enhance class {} by {} completely.", transformClassName, interceptorDefineClassName);
 
         return newClassBuilder;
     }
@@ -102,6 +114,10 @@ public abstract class AbstractClassEnhancePluginDefine {
      */
     protected String[] witnessClasses() {
         return new String[] {};
+    }
+
+    protected List<WitnessMethod> witnessMethods() {
+        return null;
     }
 
     public boolean isBootstrapInstrumentation() {

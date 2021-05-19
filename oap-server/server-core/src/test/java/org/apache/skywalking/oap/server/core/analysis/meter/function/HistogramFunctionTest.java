@@ -24,29 +24,29 @@ import org.apache.skywalking.oap.server.core.analysis.meter.MeterEntity;
 import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 import org.apache.skywalking.oap.server.core.query.type.Bucket;
 import org.apache.skywalking.oap.server.core.query.type.HeatMap;
-import org.apache.skywalking.oap.server.core.storage.StorageBuilder;
+import org.apache.skywalking.oap.server.core.storage.StorageHashMapBuilder;
 import org.junit.Assert;
 import org.junit.Test;
 
 import static org.apache.skywalking.oap.server.core.analysis.meter.function.HistogramFunction.DATASET;
 
 public class HistogramFunctionTest {
-    private static final int[] BUCKETS = new int[] {
+    private static final long[] BUCKETS = new long[] {
         0,
         50,
         100,
         250
     };
 
-    private static final int[] BUCKETS_2ND = new int[] {
+    private static final long[] BUCKETS_2ND = new long[] {
         0,
         51,
         100,
         250
     };
 
-    private static final int[] INFINITE_BUCKETS = new int[] {
-        Integer.MIN_VALUE,
+    private static final long[] INFINITE_BUCKETS = new long[] {
+        Long.MIN_VALUE,
         -5,
         0,
         10
@@ -200,13 +200,13 @@ public class HistogramFunctionTest {
             })
         );
 
-        final StorageBuilder storageBuilder = inst.builder().newInstance();
+        final StorageHashMapBuilder storageBuilder = inst.builder().newInstance();
 
         // Simulate the storage layer do, convert the datatable to string.
-        final Map map = storageBuilder.data2Map(inst);
+        final Map map = storageBuilder.entity2Storage(inst);
         map.put(DATASET, ((DataTable) map.get(DATASET)).toStorageData());
 
-        final HistogramFunction inst2 = (HistogramFunction) storageBuilder.map2Data(map);
+        final HistogramFunction inst2 = (HistogramFunction) storageBuilder.storage2Entity(map);
         Assert.assertEquals(inst, inst2);
         // HistogramFunction equal doesn't include dataset.
         Assert.assertEquals(inst.getDataset(), inst2.getDataset());

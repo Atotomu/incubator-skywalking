@@ -18,6 +18,7 @@
 
 package org.apache.skywalking.oal.rt.parser;
 
+import java.util.Arrays;
 import java.util.List;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.apache.skywalking.oal.rt.grammar.OALParser;
@@ -59,7 +60,7 @@ public class OALListener extends OALParserBaseListener {
 
     @Override
     public void enterSourceAttribute(OALParser.SourceAttributeContext ctx) {
-        current.setSourceAttribute(ctx.getText());
+        current.getSourceAttribute().add(ctx.getText());
     }
 
     @Override
@@ -105,7 +106,7 @@ public class OALListener extends OALParserBaseListener {
     ////////////
     @Override
     public void enterConditionAttribute(OALParser.ConditionAttributeContext ctx) {
-        conditionExpression.setAttribute(ctx.getText());
+        conditionExpression.getAttributes().add(ctx.getText());
     }
 
     @Override
@@ -139,6 +140,46 @@ public class OALListener extends OALParserBaseListener {
     }
 
     @Override
+    public void enterNotEqualMatch(final OALParser.NotEqualMatchContext ctx) {
+        conditionExpression.setExpressionType("notEqualMatch");
+    }
+
+    @Override
+    public void enterBooleanNotEqualMatch(final OALParser.BooleanNotEqualMatchContext ctx) {
+        conditionExpression.setExpressionType("booleanNotEqualMatch");
+    }
+
+    @Override
+    public void enterLikeMatch(final OALParser.LikeMatchContext ctx) {
+        conditionExpression.setExpressionType("likeMatch");
+    }
+
+    @Override
+    public void enterContainMatch(final OALParser.ContainMatchContext ctx) {
+        conditionExpression.setExpressionType("containMatch");
+    }
+
+    @Override
+    public void enterNotContainMatch(final OALParser.NotContainMatchContext ctx) {
+        conditionExpression.setExpressionType("notContainMatch");
+    }
+
+    @Override
+    public void enterInMatch(final OALParser.InMatchContext ctx) {
+        conditionExpression.setExpressionType("inMatch");
+    }
+
+    @Override
+    public void enterMultiConditionValue(final OALParser.MultiConditionValueContext ctx) {
+        conditionExpression.enterMultiConditionValue();
+    }
+
+    @Override
+    public void exitMultiConditionValue(final OALParser.MultiConditionValueContext ctx) {
+        conditionExpression.exitMultiConditionValue();
+    }
+
+    @Override
     public void enterBooleanConditionValue(OALParser.BooleanConditionValueContext ctx) {
         enterConditionValue(ctx.getText());
     }
@@ -155,6 +196,7 @@ public class OALListener extends OALParserBaseListener {
 
     @Override
     public void enterNumberConditionValue(OALParser.NumberConditionValueContext ctx) {
+        conditionExpression.isNumber();
         enterConditionValue(ctx.getText());
     }
 
@@ -163,7 +205,7 @@ public class OALListener extends OALParserBaseListener {
             // Value is an enum.
             value = sourcePackage + value;
         }
-        conditionExpression.setValue(value);
+        conditionExpression.addValue(value);
     }
 
     /////////////
@@ -173,10 +215,10 @@ public class OALListener extends OALParserBaseListener {
     @Override
     public void enterLiteralExpression(OALParser.LiteralExpressionContext ctx) {
         if (ctx.IDENTIFIER() == null) {
-            current.addFuncArg(new Argument(EntryMethod.LITERAL_TYPE, ctx.getText()));
+            current.addFuncArg(new Argument(EntryMethod.LITERAL_TYPE, Arrays.asList(ctx.getText())));
             return;
         }
-        current.addFuncArg(new Argument(EntryMethod.IDENTIFIER_TYPE, ctx.getText()));
+        current.addFuncArg(new Argument(EntryMethod.IDENTIFIER_TYPE, Arrays.asList(ctx.getText().split("\\."))));
     }
 
     private String metricsNameFormat(String source) {

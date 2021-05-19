@@ -19,6 +19,7 @@
 package org.apache.skywalking.apm.agent.core.kafka;
 
 import java.util.Map;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.utils.Bytes;
@@ -27,37 +28,42 @@ import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
 import org.apache.skywalking.apm.agent.core.conf.Config;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
+import org.apache.skywalking.apm.agent.core.meter.BaseMeter;
 import org.apache.skywalking.apm.agent.core.meter.MeterId;
 import org.apache.skywalking.apm.agent.core.meter.MeterSender;
 import org.apache.skywalking.apm.agent.core.meter.MeterService;
-import org.apache.skywalking.apm.agent.core.meter.transform.MeterTransformer;
 import org.apache.skywalking.apm.network.language.agent.v3.MeterDataCollection;
 
 /**
- * A report to send JVM Metrics data to Kafka Broker.
+ * A report to send Metrics data of meter system to Kafka Broker.
  */
 @OverrideImplementor(MeterSender.class)
-public class KafkaMeterSender extends MeterSender {
-    private static final ILog logger = LogManager.getLogger(KafkaTraceSegmentServiceClient.class);
+public class KafkaMeterSender extends MeterSender implements KafkaConnectionStatusListener {
+    private static final ILog LOGGER = LogManager.getLogger(KafkaTraceSegmentServiceClient.class);
 
     private String topic;
     private KafkaProducer<String, Bytes> producer;
 
     @Override
     public void prepare() {
-        topic = KafkaReporterPluginConfig.Plugin.Kafka.TOPIC_METER;
+        KafkaProducerManager producerManager = ServiceManager.INSTANCE.findService(KafkaProducerManager.class);
+        producerManager.addListener(this);
+        topic = producerManager.formatTopicNameThenRegister(KafkaReporterPluginConfig.Plugin.Kafka.TOPIC_METER);
     }
 
     @Override
     public void boot() {
-        producer = ServiceManager.INSTANCE.findService(KafkaProducerManager.class).getProducer();
     }
 
-    public void send(Map<MeterId, MeterTransformer> meterMap, MeterService meterService) {
+    @Override
+    public void send(Map<MeterId, BaseMeter> meterMap, MeterService meterService) {
+        if (producer == null) {
+            return;
+        }
         MeterDataCollection.Builder builder = MeterDataCollection.newBuilder();
         transform(meterMap, meterData -> {
-            if (logger.isDebugEnable()) {
-                logger.debug("Meter data reporting, instance: {}", meterData.getServiceInstance());
+            if (LOGGER.isDebugEnable()) {
+                LOGGER.debug("Meter data reporting, instance: {}", meterData.getServiceInstance());
             }
             builder.addMeterData(meterData);
         });
@@ -65,5 +71,12 @@ public class KafkaMeterSender extends MeterSender {
             new ProducerRecord<>(topic, Config.Agent.INSTANCE_NAME, Bytes.wrap(builder.build().toByteArray())));
 
         producer.flush();
+    }
+
+    @Override
+    public void onStatusChanged(KafkaConnectionStatus status) {
+        if (status == KafkaConnectionStatus.CONNECTED) {
+            producer = ServiceManager.INSTANCE.findService(KafkaProducerManager.class).getProducer();
+        }
     }
 }

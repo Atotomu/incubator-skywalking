@@ -57,7 +57,7 @@ public enum CustomizeConfiguration {
 
     INSTANCE;
 
-    private static final ILog logger = LogManager.getLogger(CustomizeConfiguration.class);
+    private static final ILog LOGGER = LogManager.getLogger(CustomizeConfiguration.class);
 
     /**
      * Some information after custom enhancements, this configuration is used by the custom enhancement plugin.
@@ -76,7 +76,7 @@ public enum CustomizeConfiguration {
                 addContextEnhanceClass(configuration);
             }
         } catch (Exception e) {
-            logger.error("CustomizeConfiguration loadForAgent fail", e);
+            LOGGER.error("CustomizeConfiguration loadForAgent fail", e);
         }
     }
 
@@ -92,7 +92,7 @@ public enum CustomizeConfiguration {
                 addContextMethodConfiguration(configuration);
             }
         } catch (Exception e) {
-            logger.error("CustomizeConfiguration loadForConfiguration fail", e);
+            LOGGER.error("CustomizeConfiguration loadForConfiguration fail", e);
         } finally {
             LOAD_FOR_CONFIGURATION.set(true);
         }
@@ -172,22 +172,6 @@ public enum CustomizeConfiguration {
                             Constants.XML_ELEMENT_OPERATION_NAME)
                     .getNodeValue());
         }
-        if (methodDesc.getAttributes().getNamedItem(Constants.XML_ELEMENT_CLOSE_BEFORE_METHOD) != null) {
-            MethodConfiguration.setCloseBeforeMethod(configuration, Boolean.valueOf(methodDesc.getAttributes()
-                    .getNamedItem(
-                            Constants.XML_ELEMENT_CLOSE_BEFORE_METHOD)
-                    .getNodeValue()));
-        } else {
-            MethodConfiguration.setCloseBeforeMethod(configuration, false);
-        }
-        if (methodDesc.getAttributes().getNamedItem(Constants.XML_ELEMENT_CLOSE_AFTER_METHOD) != null) {
-            MethodConfiguration.setCloseAfterMethod(configuration, Boolean.valueOf(methodDesc.getAttributes()
-                    .getNamedItem(
-                            Constants.XML_ELEMENT_CLOSE_AFTER_METHOD)
-                    .getNodeValue()));
-        } else {
-            MethodConfiguration.setCloseAfterMethod(configuration, false);
-        }
         if (methodDesc.getAttributes().getNamedItem(Constants.XML_ELEMENT_METHOD_IS_STATIC) != null) {
             MethodConfiguration.setStatic(configuration, Boolean.valueOf(methodDesc.getAttributes()
                     .getNamedItem(
@@ -257,7 +241,7 @@ public enum CustomizeConfiguration {
             }
             return configuration;
         } catch (Exception e) {
-            logger.error(e, "Failed to resolver, className is {}, methodDesc is {}.", className, methodDesc);
+            LOGGER.error(e, "Failed to resolver, className is {}, methodDesc is {}.", className, methodDesc);
         }
         return null;
     }

@@ -49,10 +49,14 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
     }
 
     @Override
-    public int readMetricsValue(final MetricsCondition condition,
+    public long readMetricsValue(final MetricsCondition condition,
                                 String valueColumnName,
                                 final Duration duration) throws IOException {
+        int defaultValue = ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
         final Function function = ValueColumnMetadata.INSTANCE.getValueFunction(condition.getName());
+        if (function == Function.Latest) {
+            return readMetricsValues(condition, valueColumnName, duration).getValues().latestValue(defaultValue);
+        }
         String op;
         switch (function) {
             case Avg:
@@ -61,8 +65,7 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
             default:
                 op = "sum";
         }
-        StringBuilder sql = new StringBuilder(
-            "select " + Metrics.ENTITY_ID + " id, " + op + "(" + valueColumnName + ") value from " + condition.getName() + " where ");
+        StringBuilder sql = buildMetricsValueSql(op, valueColumnName, condition.getName());
         final String entityId = condition.getEntity().buildId();
         List<Object> parameters = new ArrayList();
         if (entityId != null) {
@@ -80,13 +83,18 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
                 parameters.toArray(new Object[0])
             )) {
                 while (resultSet.next()) {
-                    return resultSet.getInt("value");
+                    return resultSet.getLong("value");
                 }
             }
         } catch (SQLException e) {
             throw new IOException(e);
         }
-        return ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
+        return defaultValue;
+    }
+
+    protected StringBuilder buildMetricsValueSql(String op, String valueColumnName, String conditionName) {
+        return new StringBuilder(
+                "select " + Metrics.ENTITY_ID + " id, " + op + "(" + valueColumnName + ") value from " + conditionName + " where ");
     }
 
     @Override
@@ -162,16 +170,7 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
         }
         sql.append(")");
 
-        Map<String, MetricsValues> labeledValues = new HashMap<>(labels.size());
-        labels.forEach(label -> {
-            MetricsValues labelValue = new MetricsValues();
-            labelValue.setLabel(label);
-
-            labeledValues.put(label, labelValue);
-        });
-
-        final int defaultValue = ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
-
+        Map<String, DataTable> idMap = new HashMap<>();
         try (Connection connection = h2Client.getConnection()) {
             try (ResultSet resultSet = h2Client.executeQuery(
                 connection, sql.toString(), parameters.toArray(new Object[0]))) {
@@ -181,28 +180,13 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
                     DataTable multipleValues = new DataTable(5);
                     multipleValues.toObject(resultSet.getString(valueColumnName));
 
-                    labels.forEach(label -> {
-                        Long data = multipleValues.get(label);
-                        if (data == null) {
-                            data = (long) defaultValue;
-                        }
-                        final IntValues values = labeledValues.get(label).getValues();
-                        KVInt kv = new KVInt();
-                        kv.setId(id);
-                        kv.setValue(data);
-                        values.addKVInt(kv);
-                    });
+                   idMap.put(id, multipleValues);
                 }
             }
         } catch (SQLException e) {
             throw new IOException(e);
         }
-
-        return Util.sortValues(
-            new ArrayList<>(labeledValues.values()),
-            ids,
-            defaultValue
-        );
+        return Util.composeLabelValue(condition, labels, ids, idMap);
     }
 
     @Override

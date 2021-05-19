@@ -52,7 +52,7 @@ import static net.bytebuddy.matcher.ElementMatchers.not;
  * instance methods, or both, {@link ClassEnhancePluginDefine} will add a field of {@link Object} type.
  */
 public abstract class ClassEnhancePluginDefine extends AbstractClassEnhancePluginDefine {
-    private static final ILog logger = LogManager.getLogger(ClassEnhancePluginDefine.class);
+    private static final ILog LOGGER = LogManager.getLogger(ClassEnhancePluginDefine.class);
 
     /**
      * New field name.
@@ -115,11 +115,14 @@ public abstract class ClassEnhancePluginDefine extends AbstractClassEnhancePlugi
          * And make sure the source codes manipulation only occurs once.
          *
          */
-        if (!context.isObjectExtended()) {
-            newClassBuilder = newClassBuilder.defineField(CONTEXT_ATTR_NAME, Object.class, ACC_PRIVATE | ACC_VOLATILE)
-                                             .implement(EnhancedInstance.class)
-                                             .intercept(FieldAccessor.ofField(CONTEXT_ATTR_NAME));
-            context.extendObjectCompleted();
+        if (!typeDescription.isAssignableTo(EnhancedInstance.class)) {
+            if (!context.isObjectExtended()) {
+                newClassBuilder = newClassBuilder.defineField(
+                    CONTEXT_ATTR_NAME, Object.class, ACC_PRIVATE | ACC_VOLATILE)
+                                                 .implement(EnhancedInstance.class)
+                                                 .intercept(FieldAccessor.ofField(CONTEXT_ATTR_NAME));
+                context.extendObjectCompleted();
+            }
         }
 
         /**

@@ -19,6 +19,7 @@
 package org.apache.skywalking.oap.server.core.alarm.provider;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,12 +42,18 @@ public class AlarmRule {
     private String includeNamesRegex;
     private ArrayList<String> excludeNames;
     private String excludeNamesRegex;
+    private ArrayList<String> includeLabels;
+    private String includeLabelsRegex;
+    private ArrayList<String> excludeLabels;
+    private String excludeLabelsRegex;
     private String threshold;
     private String op;
     private int period;
     private int count;
     private int silencePeriod;
     private String message;
+    private boolean onlyAsCondition;
+    private Map<String, String> tags;
 
     @Override
     public boolean equals(final Object o) {

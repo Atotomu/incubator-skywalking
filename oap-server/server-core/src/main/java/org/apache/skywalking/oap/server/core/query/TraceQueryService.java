@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.skywalking.apm.network.language.agent.v3.SegmentObject;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.CoreModule;
+import org.apache.skywalking.oap.server.core.analysis.manual.searchtag.Tag;
 import org.apache.skywalking.oap.server.core.analysis.manual.segment.SegmentRecord;
 import org.apache.skywalking.oap.server.core.config.IComponentLibraryCatalogService;
 import org.apache.skywalking.oap.server.core.query.type.KeyValue;
@@ -83,13 +84,13 @@ public class TraceQueryService implements Service {
                                        final QueryOrder queryOrder,
                                        final Pagination paging,
                                        final long startTB,
-                                       final long endTB) throws IOException {
+                                       final long endTB,
+                                       final List<Tag> tags) throws IOException {
         PaginationUtils.Page page = PaginationUtils.INSTANCE.exchange(paging);
 
         return getTraceQueryDAO().queryBasicTraces(
             startTB, endTB, minTraceDuration, maxTraceDuration, endpointName, serviceId, serviceInstanceId, endpointId,
-            traceId, page
-                .getLimit(), page.getFrom(), traceState, queryOrder
+            traceId, page.getLimit(), page.getFrom(), traceState, queryOrder, tags
         );
     }
 

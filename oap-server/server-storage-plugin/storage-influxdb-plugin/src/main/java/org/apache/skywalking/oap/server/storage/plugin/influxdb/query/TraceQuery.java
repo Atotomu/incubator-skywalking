@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.util.StringUtil;
+import org.apache.skywalking.oap.server.core.analysis.manual.searchtag.Tag;
 import org.apache.skywalking.oap.server.core.analysis.manual.segment.SegmentRecord;
 import org.apache.skywalking.oap.server.core.query.type.BasicTrace;
 import org.apache.skywalking.oap.server.core.query.type.QueryOrder;
@@ -33,12 +34,14 @@ import org.apache.skywalking.oap.server.core.query.type.TraceBrief;
 import org.apache.skywalking.oap.server.core.query.type.TraceState;
 import org.apache.skywalking.oap.server.core.storage.query.ITraceQueryDAO;
 import org.apache.skywalking.oap.server.library.util.BooleanUtils;
+import org.apache.skywalking.oap.server.library.util.CollectionUtils;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.InfluxClient;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.InfluxConstants;
 import org.elasticsearch.common.Strings;
 import org.influxdb.dto.Query;
 import org.influxdb.dto.QueryResult;
 import org.influxdb.querybuilder.SelectQueryImpl;
+import org.influxdb.querybuilder.WhereNested;
 import org.influxdb.querybuilder.WhereQueryImpl;
 import org.influxdb.querybuilder.clauses.Clause;
 
@@ -69,7 +72,8 @@ public class TraceQuery implements ITraceQueryDAO {
                                        int limit,
                                        int from,
                                        TraceState traceState,
-                                       QueryOrder queryOrder)
+                                       QueryOrder queryOrder,
+                                       final List<Tag> tags)
         throws IOException {
 
         String orderBy = SegmentRecord.START_TIME;
@@ -121,6 +125,13 @@ public class TraceQuery implements ITraceQueryDAO {
                 recallQuery.and(eq(SegmentRecord.IS_ERROR, BooleanUtils.FALSE));
                 break;
         }
+        if (CollectionUtils.isNotEmpty(tags)) {
+            WhereNested<WhereQueryImpl<SelectQueryImpl>> nested = recallQuery.andNested();
+            for (final Tag tag : tags) {
+                nested.and(contains(tag.getKey(), "'" + tag.getValue() + "'"));
+            }
+            nested.close();
+        }
 
         WhereQueryImpl<SelectQueryImpl> countQuery = select()
             .count(SegmentRecord.ENDPOINT_ID)
@@ -154,7 +165,7 @@ public class TraceQuery implements ITraceQueryDAO {
             BasicTrace basicTrace = new BasicTrace();
 
             basicTrace.setSegmentId((String) values.get(2));
-            basicTrace.setStart(String.valueOf(values.get(3)));
+            basicTrace.setStart(String.valueOf(((Number) values.get(3)).longValue()));
             basicTrace.getEndpointNames().add((String) values.get(4));
             basicTrace.setDuration(((Number) values.get(5)).intValue());
             basicTrace.setError(BooleanUtils.valueToBoolean(((Number) values.get(6)).intValue()));
@@ -167,23 +178,24 @@ public class TraceQuery implements ITraceQueryDAO {
 
     @Override
     public List<SegmentRecord> queryByTraceId(String traceId) throws IOException {
-        WhereQueryImpl query = select().column(SegmentRecord.SEGMENT_ID)
-                                       .column(SegmentRecord.TRACE_ID)
-                                       .column(SegmentRecord.SERVICE_ID)
-                                       .column(SegmentRecord.SERVICE_INSTANCE_ID)
-                                       .column(SegmentRecord.ENDPOINT_NAME)
-                                       .column(SegmentRecord.START_TIME)
-                                       .column(SegmentRecord.END_TIME)
-                                       .column(SegmentRecord.LATENCY)
-                                       .column(SegmentRecord.IS_ERROR)
-                                       .column(SegmentRecord.DATA_BINARY)
-                                       .column(SegmentRecord.VERSION)
-                                       .from(client.getDatabase(), SegmentRecord.INDEX_NAME)
-                                       .where()
-                                       .and(eq(SegmentRecord.TRACE_ID, traceId));
-        List<QueryResult.Series> series = client.queryForSeries(query);
+        WhereQueryImpl<SelectQueryImpl> whereQuery = select().column(SegmentRecord.SEGMENT_ID)
+                                                             .column(SegmentRecord.TRACE_ID)
+                                                             .column(SegmentRecord.SERVICE_ID)
+                                                             .column(SegmentRecord.SERVICE_INSTANCE_ID)
+                                                             .column(SegmentRecord.ENDPOINT_NAME)
+                                                             .column(SegmentRecord.START_TIME)
+                                                             .column(SegmentRecord.END_TIME)
+                                                             .column(SegmentRecord.LATENCY)
+                                                             .column(SegmentRecord.IS_ERROR)
+                                                             .column(SegmentRecord.DATA_BINARY)
+                                                             .column(SegmentRecord.VERSION)
+                                                             .from(client.getDatabase(), SegmentRecord.INDEX_NAME)
+                                                             .where();
+
+        whereQuery.and(eq(SegmentRecord.TRACE_ID, traceId));
+        List<QueryResult.Series> series = client.queryForSeries(whereQuery);
         if (log.isDebugEnabled()) {
-            log.debug("SQL: {} result set: {}", query.getCommand(), series);
+            log.debug("SQL: {} result set: {}", whereQuery.getCommand(), series);
         }
         if (series == null || series.isEmpty()) {
             return Collections.emptyList();
@@ -215,7 +227,7 @@ public class TraceQuery implements ITraceQueryDAO {
     }
 
     @Override
-    public List<Span> doFlexibleTraceQuery(String traceId) throws IOException {
+    public List<Span> doFlexibleTraceQuery(String traceId) {
         return Collections.emptyList();
     }
 }

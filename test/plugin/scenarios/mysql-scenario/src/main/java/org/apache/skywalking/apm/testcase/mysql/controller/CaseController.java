@@ -25,13 +25,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.SQLException;
-
 @RestController
 @RequestMapping("/case")
 public class CaseController {
 
-    private static final Logger logger = LogManager.getLogger(CaseController.class);
+    private static final Logger LOGGER = LogManager.getLogger(CaseController.class);
 
     private static final String SUCCESS = "Success";
 
@@ -55,7 +53,7 @@ public class CaseController {
             sqlExecute.callProcedure(CALL_PROCEDURE_SQL, "nihao");
             sqlExecute.dropProcedure(DROP_PROCEDURE_SQL);
         } catch (Exception e) {
-            logger.error("Failed to execute sql.", e);
+            LOGGER.error("Failed to execute sql.", e);
             throw e;
         }
         return SUCCESS;

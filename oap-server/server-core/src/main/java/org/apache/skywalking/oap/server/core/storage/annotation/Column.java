@@ -70,6 +70,14 @@ public @interface Column {
     int length() default 200;
 
     /**
+     * The return name of system environment could provide an override value of the length limitation.
+     * @return the variable name of system environment.
+     *
+     * @since 8.2.0
+     */
+    String lengthEnvVariable() default "";
+
+    /**
      * Column with data type != {@link ValueDataType#NOT_VALUE} represents this is a value column. Indicate it would be
      * queried by UI/CLI.
      *
@@ -78,6 +86,34 @@ public @interface Column {
      * @since 8.0.0
      */
     ValueDataType dataType() default ValueDataType.NOT_VALUE;
+
+    /**
+     * The storage analyzer mode.
+     *
+     * @since 8.4.0
+     */
+    AnalyzerType analyzer() default AnalyzerType.OAP_ANALYZER;
+
+    /**
+     * The analyzer declares the text analysis mode.
+     */
+    enum AnalyzerType {
+        /**
+         * The default analyzer.
+         */
+        OAP_ANALYZER("oap_analyzer"),
+        /**
+         * The log analyzer.
+         */
+        OAP_LOG_ANALYZER("oap_log_analyzer");
+
+        @Getter
+        private final String name;
+
+        AnalyzerType(final String name) {
+            this.name = name;
+        }
+    }
 
     /**
      * ValueDataType represents the data structure of value column. The persistent way of the value column determine the

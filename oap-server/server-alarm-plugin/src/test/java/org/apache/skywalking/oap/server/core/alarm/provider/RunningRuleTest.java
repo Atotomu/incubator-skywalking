@@ -23,11 +23,16 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.HashMap;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.alarm.AlarmCallback;
 import org.apache.skywalking.oap.server.core.alarm.AlarmMessage;
 import org.apache.skywalking.oap.server.core.alarm.MetaInAlarm;
+import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 import org.apache.skywalking.oap.server.core.analysis.metrics.IntValueHolder;
+import org.apache.skywalking.oap.server.core.analysis.metrics.LabeledValueHolder;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
 import org.apache.skywalking.oap.server.core.analysis.metrics.MultiIntValuesHolder;
 import org.apache.skywalking.oap.server.core.remote.grpc.proto.RemoteData;
@@ -56,7 +61,9 @@ public class RunningRuleTest {
         alarmRule.setThreshold("75");
         alarmRule.setCount(3);
         alarmRule.setPeriod(15);
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
         LocalDateTime startTime = TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301434");
         long timeInPeriod1 = 201808301434L;
@@ -84,7 +91,9 @@ public class RunningRuleTest {
         alarmRule.setCount(3);
         alarmRule.setPeriod(15);
         alarmRule.setMessage("Successful rate of endpoint {name} is lower than 75%");
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
         LocalDateTime startTime = TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301440");
 
@@ -121,7 +130,9 @@ public class RunningRuleTest {
         alarmRule.setCount(3);
         alarmRule.setPeriod(15);
         alarmRule.setMessage("response percentile of endpoint {name} is lower than expected values");
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
         LocalDateTime startTime = TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301440");
 
@@ -150,6 +161,22 @@ public class RunningRuleTest {
     }
 
     @Test
+    public void testLabeledAlarm() {
+        AlarmRule alarmRule = new AlarmRule();
+        alarmRule.setIncludeLabels(Lists.newArrayList("95", "99"));
+        assertLabeled(alarmRule);
+        alarmRule = new AlarmRule();
+        alarmRule.setIncludeLabelsRegex("9\\d{1}");
+        assertLabeled(alarmRule);
+        alarmRule = new AlarmRule();
+        alarmRule.setExcludeLabels(Lists.newArrayList("50", "75"));
+        assertLabeled(alarmRule);
+        alarmRule = new AlarmRule();
+        alarmRule.setExcludeLabelsRegex("^[5-7][0-9]$");
+        assertLabeled(alarmRule);
+    }
+
+    @Test
     public void testNoAlarm() {
         AlarmRule alarmRule = new AlarmRule();
         alarmRule.setAlarmRuleName("endpoint_percent_rule");
@@ -159,7 +186,9 @@ public class RunningRuleTest {
         alarmRule.setCount(3);
         alarmRule.setPeriod(15);
         //alarmRule.setSilencePeriod(0);
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
         LocalDateTime startTime = TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301441");
 
@@ -204,7 +233,9 @@ public class RunningRuleTest {
         alarmRule.setCount(3);
         alarmRule.setPeriod(15);
         alarmRule.setSilencePeriod(2);
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
 
         long timeInPeriod1 = 201808301434L;
@@ -241,7 +272,9 @@ public class RunningRuleTest {
         alarmRule.setPeriod(15);
         alarmRule.setMessage("Successful rate of endpoint {name} is lower than 75%");
         alarmRule.setExcludeNames(Lists.newArrayList("Service_123"));
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
 
         long timeInPeriod1 = 201808301434L;
@@ -273,7 +306,9 @@ public class RunningRuleTest {
         alarmRule.setPeriod(10);
         alarmRule.setMessage("Response time of service instance {name} is more than 1000ms in 2 minutes of last 10 minutes");
         alarmRule.setIncludeNamesRegex("Service\\_1(\\d)+");
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
 
         long timeInPeriod1 = 201808301434L;
@@ -305,7 +340,9 @@ public class RunningRuleTest {
         alarmRule.setPeriod(10);
         alarmRule.setMessage("Response time of service instance {name} is more than 1000ms in 2 minutes of last 10 minutes");
         alarmRule.setExcludeNamesRegex("Service\\_2(\\d)+");
-
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
         RunningRule runningRule = new RunningRule(alarmRule);
 
         long timeInPeriod1 = 201808301434L;
@@ -386,6 +423,13 @@ public class RunningRuleTest {
 
     }
 
+    private Metrics getLabeledValueMetrics(long timeBucket, String values) {
+        MockLabeledValueMetrics mockLabeledValueMetrics = new MockLabeledValueMetrics();
+        mockLabeledValueMetrics.setValue(new DataTable(values));
+        mockLabeledValueMetrics.setTimeBucket(timeBucket);
+        return mockLabeledValueMetrics;
+    }
+
     private class MockMetrics extends Metrics implements IntValueHolder {
         private int value;
 
@@ -395,8 +439,8 @@ public class RunningRuleTest {
         }
 
         @Override
-        public void combine(Metrics metrics) {
-
+        public boolean combine(Metrics metrics) {
+            return true;
         }
 
         @Override
@@ -452,8 +496,8 @@ public class RunningRuleTest {
         }
 
         @Override
-        public void combine(Metrics metrics) {
-
+        public boolean combine(Metrics metrics) {
+            return true;
         }
 
         @Override
@@ -490,5 +534,91 @@ public class RunningRuleTest {
         public RemoteData.Builder serialize() {
             return null;
         }
+    }
+
+    private class MockLabeledValueMetrics extends Metrics implements LabeledValueHolder {
+
+        @Getter
+        @Setter
+        private DataTable value;
+
+        @Override
+        public String id() {
+            return null;
+        }
+
+        @Override
+        public boolean combine(Metrics metrics) {
+            return true;
+        }
+
+        @Override
+        public void calculate() {
+
+        }
+
+        @Override
+        public Metrics toHour() {
+            return null;
+        }
+
+        @Override
+        public Metrics toDay() {
+            return null;
+        }
+
+        @Override
+        public int remoteHashCode() {
+            return 0;
+        }
+
+        @Override
+        public void deserialize(RemoteData remoteData) {
+
+        }
+
+        @Override
+        public RemoteData.Builder serialize() {
+            return null;
+        }
+    }
+
+    private void assertLabeled(AlarmRule alarmRule) {
+        alarmRule.setAlarmRuleName("endpoint_percent_alarm_rule");
+        alarmRule.setMetricsName("endpoint_percent");
+        alarmRule.setOp(">");
+        alarmRule.setThreshold("10");
+        alarmRule.setCount(3);
+        alarmRule.setPeriod(15);
+        alarmRule.setMessage("response percentile of endpoint {name} is lower than expected value");
+        alarmRule.setTags(new HashMap<String, String>() {{
+            put("key", "value");
+        }});
+        RunningRule runningRule = new RunningRule(alarmRule);
+        LocalDateTime startTime = TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301440");
+
+        long timeInPeriod1 = 201808301434L;
+        long timeInPeriod2 = 201808301436L;
+        long timeInPeriod3 = 201808301438L;
+
+        runningRule.in(getMetaInAlarm(123), getLabeledValueMetrics(timeInPeriod1, "50,17|99,11"));
+        runningRule.in(getMetaInAlarm(123), getLabeledValueMetrics(timeInPeriod2, "75,15|95,12"));
+        runningRule.in(getMetaInAlarm(123), getLabeledValueMetrics(timeInPeriod3, "90,1|99,20"));
+
+        // check at 201808301440
+        List<AlarmMessage> alarmMessages = runningRule.check();
+        Assert.assertEquals(0, alarmMessages.size());
+        runningRule.moveTo(TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301441"));
+        // check at 201808301441
+        alarmMessages = runningRule.check();
+        Assert.assertEquals(0, alarmMessages.size());
+        runningRule.moveTo(TIME_BUCKET_FORMATTER.parseLocalDateTime("201808301442"));
+        // check at 201808301442
+        alarmMessages = runningRule.check();
+        Assert.assertEquals(1, alarmMessages.size());
+        Assert.assertEquals(
+            "response percentile of endpoint Service_123 is lower than expected value", alarmMessages.get(0)
+                .getAlarmMessage());
+
     }
 }

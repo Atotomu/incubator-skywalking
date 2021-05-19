@@ -19,6 +19,7 @@
 package org.apache.skywalking.apm.agent.core.boot;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,7 +35,7 @@ import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
 public enum ServiceManager {
     INSTANCE;
 
-    private static final ILog logger = LogManager.getLogger(ServiceManager.class);
+    private static final ILog LOGGER = LogManager.getLogger(ServiceManager.class);
     private Map<Class, BootService> bootedServices = Collections.emptyMap();
 
     public void boot() {
@@ -46,13 +47,13 @@ public enum ServiceManager {
     }
 
     public void shutdown() {
-        for (BootService service : bootedServices.values()) {
+        bootedServices.values().stream().sorted(Comparator.comparingInt(BootService::priority).reversed()).forEach(service -> {
             try {
                 service.shutdown();
             } catch (Throwable e) {
-                logger.error(e, "ServiceManager try to shutdown [{}] fail.", service.getClass().getName());
+                LOGGER.error(e, "ServiceManager try to shutdown [{}] fail.", service.getClass().getName());
             }
-        }
+        });
     }
 
     private Map<Class, BootService> loadAllServices() {
@@ -99,23 +100,23 @@ public enum ServiceManager {
     }
 
     private void prepare() {
-        for (BootService service : bootedServices.values()) {
+        bootedServices.values().stream().sorted(Comparator.comparingInt(BootService::priority)).forEach(service -> {
             try {
                 service.prepare();
             } catch (Throwable e) {
-                logger.error(e, "ServiceManager try to pre-start [{}] fail.", service.getClass().getName());
+                LOGGER.error(e, "ServiceManager try to pre-start [{}] fail.", service.getClass().getName());
             }
-        }
+        });
     }
 
     private void startup() {
-        for (BootService service : bootedServices.values()) {
+        bootedServices.values().stream().sorted(Comparator.comparingInt(BootService::priority)).forEach(service -> {
             try {
                 service.boot();
             } catch (Throwable e) {
-                logger.error(e, "ServiceManager try to start [{}] fail.", service.getClass().getName());
+                LOGGER.error(e, "ServiceManager try to start [{}] fail.", service.getClass().getName());
             }
-        }
+        });
     }
 
     private void onComplete() {
@@ -123,7 +124,7 @@ public enum ServiceManager {
             try {
                 service.onComplete();
             } catch (Throwable e) {
-                logger.error(e, "Service [{}] AfterBoot process fails.", service.getClass().getName());
+                LOGGER.error(e, "Service [{}] AfterBoot process fails.", service.getClass().getName());
             }
         }
     }

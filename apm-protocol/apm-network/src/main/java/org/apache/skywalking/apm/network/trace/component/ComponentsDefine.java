@@ -168,4 +168,36 @@ public class ComponentsDefine {
     public static final OfficialComponent GRAPHQL = new OfficialComponent(92, "GraphQL");
 
     public static final OfficialComponent SPRING_ANNOTATION = new OfficialComponent(93, "spring-annotation");
+
+    public static final OfficialComponent HBASE = new OfficialComponent(94, "HBase");
+
+    public static final OfficialComponent SPRING_KAFKA_CONSUMER = new OfficialComponent(95, "spring-kafka-consumer");
+
+    public static final OfficialComponent SPRING_SCHEDULED = new OfficialComponent(96, "SpringScheduled");
+
+    public static final OfficialComponent QUARTZ_SCHEDULER = new OfficialComponent(97, "quartz-scheduler");
+
+    public static final OfficialComponent XXL_JOB = new OfficialComponent(98, "xxl-job");
+
+    public static final OfficialComponent SPRING_WEBCLIENT = new OfficialComponent(99, "spring-webflux-webclient");
+
+    public static final OfficialComponent THRIFT_SERVER = new OfficialComponent(100, "thrift-server");
+
+    public static final OfficialComponent THRIFT_CLIENT = new OfficialComponent(101, "thrift-client");
+
+    public static final OfficialComponent ASYNC_HTTP_CLIENT = new OfficialComponent(102, "AsyncHttpClient");
+
+    public static final OfficialComponent DBCP = new OfficialComponent(103, "dbcp");
+
+    public static final OfficialComponent MSSQL_JDBC_DRIVER = new OfficialComponent(104, "mssql-jdbc-driver");
+
+    public static final OfficialComponent APACHE_CXF = new OfficialComponent(105, "Apache-CXF");
+
+    public static final OfficialComponent DOLPHIN_SCHEDULER = new OfficialComponent(106, "dolphinscheduler");
+
+    public static final OfficialComponent JSON_RPC = new OfficialComponent(107, "JsonRpc");
+  
+    public static final OfficialComponent SEATA = new OfficialComponent(108, "Seata");
+
+    public static final OfficialComponent MYBATIS = new OfficialComponent(109, "MyBatis");
 }

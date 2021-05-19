@@ -50,14 +50,14 @@ import org.slf4j.LoggerFactory;
 
 public class ITElasticSearchClient {
 
-    private static final Logger logger = LoggerFactory.getLogger(ITElasticSearchClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ITElasticSearchClient.class);
 
     private ElasticSearchClient client;
 
     private final String namespace;
 
     public ITElasticSearchClient() {
-        namespace = "";
+        namespace = "default-test-namespace";
     }
 
     protected ITElasticSearchClient(String namespace) {
@@ -99,7 +99,7 @@ public class ITElasticSearchClient {
         Assert.assertTrue(client.isExistsIndex(indexName));
 
         JsonObject index = getIndex(indexName);
-        logger.info(index.toString());
+        LOGGER.info(index.toString());
 
         Assert.assertEquals(2, index.getAsJsonObject(indexName)
                                     .getAsJsonObject("settings")
@@ -176,15 +176,14 @@ public class ITElasticSearchClient {
 
         String indexName = "template_operate";
 
-        client.createTemplate(indexName, settings, mapping);
+        client.createOrUpdateTemplate(indexName, settings, mapping);
 
         Assert.assertTrue(client.isExistsTemplate(indexName));
 
         XContentBuilder builder = XContentFactory.jsonBuilder().startObject().field("name", "pengys").endObject();
         client.forceInsert(indexName + "-2019", "testid", builder);
-
         JsonObject index = getIndex(indexName + "-2019");
-        logger.info(index.toString());
+        LOGGER.info(index.toString());
 
         Assert.assertEquals(1, index.getAsJsonObject(indexName + "-2019")
                                     .getAsJsonObject("settings")
@@ -196,7 +195,6 @@ public class ITElasticSearchClient {
                                     .getAsJsonObject("index")
                                     .get("number_of_replicas")
                                     .getAsInt());
-
         client.deleteTemplate(indexName);
         Assert.assertFalse(client.isExistsTemplate(indexName));
     }
@@ -235,7 +233,7 @@ public class ITElasticSearchClient {
         column.addProperty("type", "text");
         properties.add("name", column);
 
-        client.createTemplate(indexName, new HashMap<>(), mapping);
+        client.createOrUpdateTemplate(indexName, new HashMap<>(), mapping);
 
         XContentBuilder builder = XContentFactory.jsonBuilder().startObject().field("name", "pengys").endObject();
         client.forceInsert(timeSeriesIndexName, "testid", builder);
@@ -245,6 +243,7 @@ public class ITElasticSearchClient {
         String index = indexes.get(0);
         Assert.assertTrue(client.deleteByIndexName(index));
         Assert.assertFalse(client.isExistsIndex(timeSeriesIndexName));
+        client.deleteTemplate(indexName);
     }
 
     private JsonObject getIndex(String indexName) throws IOException {
@@ -265,7 +264,7 @@ public class ITElasticSearchClient {
 
     private JsonObject undoFormatIndexName(JsonObject index) {
         if (StringUtil.isNotEmpty(namespace) && index != null && index.size() > 0) {
-            logger.info("UndoFormatIndexName before " + index.toString());
+            LOGGER.info("UndoFormatIndexName before " + index.toString());
             String namespacePrefix = namespace + "_";
             index.entrySet().forEach(entry -> {
                 String oldIndexName = entry.getKey();
@@ -278,7 +277,7 @@ public class ITElasticSearchClient {
                             .getKey());
                 }
             });
-            logger.info("UndoFormatIndexName after " + index.toString());
+            LOGGER.info("UndoFormatIndexName after " + index.toString());
         }
         return index;
     }

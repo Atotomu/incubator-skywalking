@@ -93,6 +93,15 @@ public class ServiceRelation extends Source {
     @Getter
     @Setter
     private DetectPoint detectPoint;
+    @Getter
+    @Setter
+    private String tlsMode;
+    @Getter
+    @Setter
+    private SideCar sideCar = new SideCar();
+    @Getter
+    @Setter
+    private TCPInfo tcpInfo = new TCPInfo();
 
     @Override
     public void prepare() {

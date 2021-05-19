@@ -28,7 +28,12 @@ mvnw=${home}/../../mvnw
 agent_home="${home}"/../../skywalking-agent
 jacoco_home="${home}"/../jacoco
 scenarios_home="${home}/scenarios"
-num_of_testcases=0
+num_of_testcases=
+
+image_version="jdk8-1.0.0"
+jacoco_version="${JACOCO_VERSION:-0.8.6}"
+
+os="$(uname)"
 
 print_help() {
     echo  "Usage: run.sh [OPTION] SCENARIO_NAME"
@@ -50,6 +55,13 @@ parse_commandline() {
                 ;;
             --debug)
                 debug_mode="on";
+                ;;
+            --image_version)
+                image_version="$2"
+                shift
+                ;;
+            --image_version=*)
+                image_version="${_key##--image_version=}"
                 ;;
             -h|--help)
                 print_help
@@ -81,7 +93,7 @@ printSystemInfo(){
 }
 
 do_cleanup() {
-    images=$(docker images -q "skywalking/agent-test-*:${BUILD_NO:=local}")
+    images=$(docker images -q "skywalking/agent-test-*")
     [[ -n "${images}" ]] && docker rmi -f ${images}
     images=$(docker images -qf "dangling=true")
     [[ -n "${images}" ]] && docker rmi -f ${images}
@@ -131,7 +143,31 @@ if [[ ! -d ${agent_home} ]]; then
     echo "[WARN] SkyWalking Agent not exists"
     ${mvnw} --batch-mode -f ${home}/../../pom.xml -Pagent -DskipTests clean package
 fi
-[[ "$force_build" == "on" ]] && ${mvnw} --batch-mode -f ${home}/pom.xml clean package -DskipTests -DBUILD_NO=${BUILD_NO:=local} docker:build
+# if it fails last time, relevant information will be deleted
+if [ "$os" == 'Darwin' ]; then
+    sed -i '' '/<sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>/d' ./pom.xml
+else
+    sed -i '/<sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>/d' ./pom.xml
+fi
+# add scenario_name into plugin/pom.xml
+echo check code with the checkstyle-plugin
+if [ "$os" == 'Darwin' ]; then
+    sed -i '' '/<\/sourceDirectories>/i\'$'\n''<sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>'$'\n' ./pom.xml
+else
+    sed -i '/<\/sourceDirectories>/i <sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>' ./pom.xml
+fi
+
+if [[ "$force_build" == "on" ]]; then
+    profile=
+    [[ $image_version =~ "jdk14-" ]] && profile="-Pjdk14"
+    ${mvnw} --batch-mode -f ${home}/pom.xml clean package -DskipTests ${profile}
+fi
+# remove scenario_name into plugin/pom.xml
+if [ "$os" == 'Darwin' ]; then
+    sed -i '' '/<sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>/d' ./pom.xml
+else
+    sed -i '/<sourceDirectory>scenarios\/'"$scenario_name"'<\/sourceDirectory>/d' ./pom.xml
+fi
 
 workspace="${home}/workspace/${scenario_name}"
 [[ -d ${workspace} ]] && rm -rf $workspace
@@ -144,7 +180,6 @@ fi
 
 echo "start submit job"
 scenario_home=${scenarios_home}/${scenario_name} && cd ${scenario_home}
-
 
 supported_version_file=${scenario_home}/support-version.list
 if [[ ! -f $supported_version_file ]]; then
@@ -160,6 +195,10 @@ if [[ -n "${running_mode}" ]]; then
        "'withPlugins' is required configuration when 'runningMode' was set as 'optional_plugins' or 'bootstrap_plugins'"
     agent_home_selector ${running_mode} ${with_plugins}
 fi
+
+mkdir -p "${jacoco_home}"
+ls "${jacoco_home}"/jacocoagent.jar || curl -Lso "${jacoco_home}"/jacocoagent.jar https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/${jacoco_version}/org.jacoco.agent-${jacoco_version}-runtime.jar
+ls "${jacoco_home}"/jacococli.jar || curl -Lso "${jacoco_home}"/jacococli.jar https://repo1.maven.org/maven2/org/jacoco/org.jacoco.cli/${jacoco_version}/org.jacoco.cli-${jacoco_version}-nodeps.jar
 
 supported_versions=`grep -v -E "^$|^#" ${supported_version_file}`
 for version in ${supported_versions}
@@ -189,7 +228,7 @@ do
         -Dagent.dir=${_agent_home} \
         -Djacoco.home=${jacoco_home} \
         -Ddebug.mode=${debug_mode} \
-        -Ddocker.image.version=${BUILD_NO:=local} \
+        -Ddocker.image.version=${image_version} \
         ${plugin_runner_helper} 1>${case_work_logs_dir}/helper.log
 
     [[ $? -ne 0 ]] && exitWithMessage "${testcase_name}, generate script failure!"

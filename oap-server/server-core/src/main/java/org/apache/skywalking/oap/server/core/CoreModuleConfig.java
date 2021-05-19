@@ -21,6 +21,7 @@ package org.apache.skywalking.oap.server.core;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.skywalking.oap.server.core.source.ScopeDefaultColumn;
 import org.apache.skywalking.oap.server.library.module.ModuleConfig;
 
@@ -116,6 +117,46 @@ public class CoreModuleConfig extends ModuleConfig {
      * In the current practice, we don't recommend the length over 190.
      */
     private int endpointNameMaxLength = 150;
+    /**
+     * Define the set of span tag keys, which should be searchable through the GraphQL.
+     *
+     * @since 8.2.0
+     */
+    @Setter
+    @Getter
+    private String searchableTracesTags = DEFAULT_SEARCHABLE_TAG_KEYS;
+    /**
+     * Define the set of logs tag keys, which should be searchable through the GraphQL.
+     *
+     * @since 8.4.0
+     */
+    @Setter
+    @Getter
+    private String searchableLogsTags = "";
+    /**
+     * Define the set of Alarm tag keys, which should be searchable through the GraphQL.
+     *
+     * @since 8.6.0
+     */
+    @Setter
+    @Getter
+    private String searchableAlarmTags = "";
+    /**
+     * The number of threads used to synchronously refresh the metrics data to the storage.
+     *
+     * @since 8.5.0
+     */
+    @Setter
+    @Getter
+    private int syncThreads = 2;
+
+    /**
+     * The maximum number of processes supported for each synchronous storage operation. When the number of the flush
+     * data is greater than this value, it will be assigned to multiple cores for execution.
+     */
+    @Getter
+    @Setter
+    private int maxSyncOperationNum = 50000;
 
     public CoreModuleConfig() {
         this.downsampling = new ArrayList<>();
@@ -140,6 +181,30 @@ public class CoreModuleConfig extends ModuleConfig {
          * Aggregator mode OAP receives data from {@link #Mixed} and {@link #Aggregator} OAP nodes, and do 2nd round
          * aggregation. Then save the final result to the storage.
          */
-        Aggregator
+        Aggregator;
+
+        public static Role fromName(String name) {
+            for (Role role : Role.values()) {
+                if (role.name().equalsIgnoreCase(name)) {
+                    return role;
+                }
+            }
+            return Mixed;
+        }
     }
+
+    /**
+     * SkyWalking Java Agent provides the recommended tag keys for other language agents or SDKs. This field declare the
+     * recommended keys should be searchable.
+     */
+    private static final String DEFAULT_SEARCHABLE_TAG_KEYS = String.join(
+        Const.COMMA,
+        "http.method",
+        "status_code",
+        "db.type",
+        "db.instance",
+        "mq.queue",
+        "mq.topic",
+        "mq.broker"
+    );
 }

@@ -20,9 +20,12 @@ package org.apache.skywalking.oap.server.storage.plugin.jdbc.h2;
 
 import java.util.Properties;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.CoreModule;
+import org.apache.skywalking.oap.server.core.config.ConfigService;
 import org.apache.skywalking.oap.server.core.storage.IBatchDAO;
 import org.apache.skywalking.oap.server.core.storage.IHistoryDeleteDAO;
+import org.apache.skywalking.oap.server.core.storage.StorageBuilderFactory;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
@@ -34,6 +37,8 @@ import org.apache.skywalking.oap.server.core.storage.profile.IProfileTaskQueryDA
 import org.apache.skywalking.oap.server.core.storage.profile.IProfileThreadSnapshotQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IAggregationQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IAlarmQueryDAO;
+import org.apache.skywalking.oap.server.core.storage.query.IBrowserLogQueryDAO;
+import org.apache.skywalking.oap.server.core.storage.query.IEventQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.ILogQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IMetadataQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IMetricsQueryDAO;
@@ -49,6 +54,8 @@ import org.apache.skywalking.oap.server.library.module.ServiceNotProvidedExcepti
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2AggregationQueryDAO;
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2AlarmQueryDAO;
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2BatchDAO;
+import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2BrowserLogQueryDAO;
+import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2EventQueryDAO;
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2HistoryDeleteDAO;
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2LogQueryDAO;
 import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2MetadataQueryDAO;
@@ -101,6 +108,8 @@ public class H2StorageProvider extends ModuleProvider {
 
     @Override
     public void prepare() throws ServiceNotProvidedException, ModuleStartException {
+        this.registerServiceImplementation(StorageBuilderFactory.class, new StorageBuilderFactory.Default());
+
         Properties settings = new Properties();
         settings.setProperty("dataSourceClassName", config.getDriver());
         settings.setProperty("dataSource.url", config.getUrl());
@@ -109,39 +118,87 @@ public class H2StorageProvider extends ModuleProvider {
         h2Client = new JDBCHikariCPClient(settings);
 
         this.registerServiceImplementation(IBatchDAO.class, new H2BatchDAO(h2Client));
-        this.registerServiceImplementation(StorageDAO.class, new H2StorageDAO(h2Client));
+        this.registerServiceImplementation(
+            StorageDAO.class,
+            new H2StorageDAO(
+                getManager(), h2Client, config.getMaxSizeOfArrayColumn(), config.getNumOfSearchableValuesPerTag())
+        );
 
         this.registerServiceImplementation(
-                INetworkAddressAliasDAO.class, new H2NetworkAddressAliasDAO(h2Client));
+            INetworkAddressAliasDAO.class, new H2NetworkAddressAliasDAO(h2Client));
 
         this.registerServiceImplementation(ITopologyQueryDAO.class, new H2TopologyQueryDAO(h2Client));
         this.registerServiceImplementation(IMetricsQueryDAO.class, new H2MetricsQueryDAO(h2Client));
-        this.registerServiceImplementation(ITraceQueryDAO.class, new H2TraceQueryDAO(h2Client));
         this.registerServiceImplementation(
-                IMetadataQueryDAO.class, new H2MetadataQueryDAO(h2Client, config.getMetadataQueryMaxSize()));
+            ITraceQueryDAO.class, new H2TraceQueryDAO(
+                getManager(),
+                h2Client,
+                config.getMaxSizeOfArrayColumn(),
+                config.getNumOfSearchableValuesPerTag()
+            ));
+        this.registerServiceImplementation(IBrowserLogQueryDAO.class, new H2BrowserLogQueryDAO(h2Client));
+        this.registerServiceImplementation(
+            IMetadataQueryDAO.class, new H2MetadataQueryDAO(h2Client, config.getMetadataQueryMaxSize()));
         this.registerServiceImplementation(IAggregationQueryDAO.class, new H2AggregationQueryDAO(h2Client));
-        this.registerServiceImplementation(IAlarmQueryDAO.class, new H2AlarmQueryDAO(h2Client));
+        this.registerServiceImplementation(IAlarmQueryDAO.class, new H2AlarmQueryDAO(
+                h2Client,
+                getManager(),
+                config.getMaxSizeOfArrayColumn(),
+                config.getNumOfSearchableValuesPerTag()
+        ));
         this.registerServiceImplementation(
-                IHistoryDeleteDAO.class, new H2HistoryDeleteDAO(h2Client));
+            IHistoryDeleteDAO.class, new H2HistoryDeleteDAO(h2Client));
         this.registerServiceImplementation(ITopNRecordsQueryDAO.class, new H2TopNRecordsQueryDAO(h2Client));
-        this.registerServiceImplementation(ILogQueryDAO.class, new H2LogQueryDAO(h2Client));
+        this.registerServiceImplementation(
+            ILogQueryDAO.class,
+            new H2LogQueryDAO(
+                h2Client,
+                getManager(),
+                config.getMaxSizeOfArrayColumn(),
+                config.getNumOfSearchableValuesPerTag()
+            )
+        );
 
         this.registerServiceImplementation(IProfileTaskQueryDAO.class, new H2ProfileTaskQueryDAO(h2Client));
         this.registerServiceImplementation(IProfileTaskLogQueryDAO.class, new H2ProfileTaskLogQueryDAO(h2Client));
         this.registerServiceImplementation(
-                IProfileThreadSnapshotQueryDAO.class, new H2ProfileThreadSnapshotQueryDAO(h2Client));
+            IProfileThreadSnapshotQueryDAO.class, new H2ProfileThreadSnapshotQueryDAO(h2Client));
         this.registerServiceImplementation(UITemplateManagementDAO.class, new H2UITemplateManagementDAO(h2Client));
+
+        this.registerServiceImplementation(IEventQueryDAO.class, new H2EventQueryDAO(h2Client));
     }
 
     @Override
     public void start() throws ServiceNotProvidedException, ModuleStartException {
-        MetricsCreator metricCreator = getManager().find(TelemetryModule.NAME).provider().getService(MetricsCreator.class);
-        HealthCheckMetrics healthChecker = metricCreator.createHealthCheckerGauge("storage_h2", MetricsTag.EMPTY_KEY, MetricsTag.EMPTY_VALUE);
+        final ConfigService configService = getManager().find(CoreModule.NAME)
+                                                        .provider()
+                                                        .getService(ConfigService.class);
+        final int numOfSearchableTracesTags = configService.getSearchableTracesTags().split(Const.COMMA).length;
+        if (numOfSearchableTracesTags * config.getNumOfSearchableValuesPerTag() > config.getMaxSizeOfArrayColumn()) {
+            throw new ModuleStartException("Size of searchableTracesTags[" + numOfSearchableTracesTags
+                                               + "] * numOfSearchableValuesPerTag[" + config.getNumOfSearchableValuesPerTag()
+                                               + "] > maxSizeOfArrayColumn[" + config.getMaxSizeOfArrayColumn()
+                                               + "]. Potential out of bound in the runtime.");
+        }
+        final int numOfSearchableLogsTags = configService.getSearchableLogsTags().split(Const.COMMA).length;
+        if (numOfSearchableLogsTags * config.getNumOfSearchableValuesPerTag() > config.getMaxSizeOfArrayColumn()) {
+            throw new ModuleStartException("Size of searchableLogsTags[" + numOfSearchableLogsTags
+                                               + "] * numOfSearchableValuesPerTag[" + config.getNumOfSearchableValuesPerTag()
+                                               + "] > maxSizeOfArrayColumn[" + config.getMaxSizeOfArrayColumn()
+                                               + "]. Potential out of bound in the runtime.");
+        }
+
+        MetricsCreator metricCreator = getManager().find(TelemetryModule.NAME)
+                                                   .provider()
+                                                   .getService(MetricsCreator.class);
+        HealthCheckMetrics healthChecker = metricCreator.createHealthCheckerGauge(
+            "storage_h2", MetricsTag.EMPTY_KEY, MetricsTag.EMPTY_VALUE);
         h2Client.registerChecker(healthChecker);
         try {
             h2Client.connect();
 
-            H2TableInstaller installer = new H2TableInstaller(h2Client, getManager());
+            H2TableInstaller installer = new H2TableInstaller(
+                h2Client, getManager(), config.getMaxSizeOfArrayColumn(), config.getNumOfSearchableValuesPerTag());
             getManager().find(CoreModule.NAME).provider().getService(ModelCreator.class).addModelListener(installer);
         } catch (StorageException e) {
             throw new ModuleStartException(e.getMessage(), e);
@@ -155,6 +212,6 @@ public class H2StorageProvider extends ModuleProvider {
 
     @Override
     public String[] requiredModules() {
-        return new String[]{CoreModule.NAME};
+        return new String[] {CoreModule.NAME};
     }
 }

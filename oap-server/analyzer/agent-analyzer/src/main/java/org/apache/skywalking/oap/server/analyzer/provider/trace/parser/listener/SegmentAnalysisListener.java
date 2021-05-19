@@ -18,22 +18,30 @@
 
 package org.apache.skywalking.oap.server.analyzer.provider.trace.parser.listener;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.network.language.agent.v3.SegmentObject;
 import org.apache.skywalking.apm.network.language.agent.v3.SpanObject;
 import org.apache.skywalking.apm.util.StringUtil;
+import org.apache.skywalking.oap.server.analyzer.provider.AnalyzerModuleConfig;
+import org.apache.skywalking.oap.server.analyzer.provider.trace.TraceLatencyThresholdsAndWatcher;
+import org.apache.skywalking.oap.server.analyzer.provider.trace.parser.listener.strategy.SegmentStatusAnalyzer;
+import org.apache.skywalking.oap.server.analyzer.provider.trace.parser.listener.strategy.SegmentStatusStrategy;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.analysis.IDManager;
 import org.apache.skywalking.oap.server.core.analysis.NodeType;
 import org.apache.skywalking.oap.server.core.analysis.TimeBucket;
+import org.apache.skywalking.oap.server.core.analysis.manual.searchtag.Tag;
+import org.apache.skywalking.oap.server.core.config.ConfigService;
 import org.apache.skywalking.oap.server.core.config.NamingControl;
 import org.apache.skywalking.oap.server.core.source.Segment;
 import org.apache.skywalking.oap.server.core.source.SourceReceiver;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 import org.apache.skywalking.oap.server.library.util.BooleanUtils;
-import org.apache.skywalking.oap.server.analyzer.provider.AnalyzerModuleConfig;
 
 /**
  * SegmentSpanListener forwards the segment raw data to the persistence layer with the query required conditions.
@@ -43,7 +51,11 @@ import org.apache.skywalking.oap.server.analyzer.provider.AnalyzerModuleConfig;
 public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnalysisListener, SegmentListener {
     private final SourceReceiver sourceReceiver;
     private final TraceSegmentSampler sampler;
+    private final boolean forceSampleErrorSegment;
     private final NamingControl namingControl;
+    private final List<String> searchableTagKeys;
+    private final SegmentStatusAnalyzer segmentStatusAnalyzer;
+    private final TraceLatencyThresholdsAndWatcher traceLatencyThresholdsAndWatcher;
 
     private final Segment segment = new Segment();
     private SAMPLE_STATUS sampleStatus = SAMPLE_STATUS.UNKNOWN;
@@ -96,7 +108,6 @@ public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnal
             serviceId,
             endpointName
         );
-
     }
 
     @Override
@@ -107,11 +118,6 @@ public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnal
                 serviceName, NodeType.Normal);
         }
 
-        endpointId = IDManager.EndpointID.buildId(
-            serviceId,
-            span.getOperationName()
-        );
-
         endpointName = namingControl.formatEndpointName(serviceName, span.getOperationName());
         endpointId = IDManager.EndpointID.buildId(
             serviceId,
@@ -121,18 +127,6 @@ public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnal
 
     @Override
     public void parseSegment(SegmentObject segmentObject) {
-        if (sampleStatus.equals(SAMPLE_STATUS.UNKNOWN) || sampleStatus.equals(SAMPLE_STATUS.IGNORE)) {
-            if (sampler.shouldSample(segmentObject.getTraceSegmentId())) {
-                sampleStatus = SAMPLE_STATUS.SAMPLED;
-            } else {
-                sampleStatus = SAMPLE_STATUS.IGNORE;
-            }
-        }
-
-        if (sampleStatus.equals(SAMPLE_STATUS.IGNORE)) {
-            return;
-        }
-
         segment.setTraceId(segmentObject.getTraceId());
         segmentObject.getSpansList().forEach(span -> {
             if (startTimestamp == 0 || startTimestamp > span.getStartTime()) {
@@ -141,12 +135,37 @@ public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnal
             if (span.getEndTime() > endTimestamp) {
                 endTimestamp = span.getEndTime();
             }
-            if (!isError && span.getIsError()) {
-                isError = true;
-            }
+            isError = isError || segmentStatusAnalyzer.isError(span);
+            appendSearchableTags(span);
         });
         final long accurateDuration = endTimestamp - startTimestamp;
         duration = accurateDuration > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) accurateDuration;
+
+        if (sampleStatus.equals(SAMPLE_STATUS.UNKNOWN) || sampleStatus.equals(SAMPLE_STATUS.IGNORE)) {
+            if (sampler.shouldSample(segmentObject.getTraceId())) {
+                sampleStatus = SAMPLE_STATUS.SAMPLED;
+            } else if (isError && forceSampleErrorSegment) {
+                sampleStatus = SAMPLE_STATUS.SAMPLED;
+            } else if (traceLatencyThresholdsAndWatcher.shouldSample(duration)) {
+                sampleStatus = SAMPLE_STATUS.SAMPLED;
+            } else {
+                sampleStatus = SAMPLE_STATUS.IGNORE;
+            }
+        }
+    }
+
+    private void appendSearchableTags(SpanObject span) {
+        HashSet<Tag> segmentTags = new HashSet<>();
+        span.getTagsList().forEach(tag -> {
+            if (searchableTagKeys.contains(tag.getKey())) {
+                final Tag spanTag = new Tag(tag.getKey(), tag.getValue());
+                if (!segmentTags.contains(spanTag)) {
+                    segmentTags.add(spanTag);
+                }
+
+            }
+        });
+        segment.getTags().addAll(segmentTags);
     }
 
     @Override
@@ -172,19 +191,39 @@ public class SegmentAnalysisListener implements FirstAnalysisListener, EntryAnal
     public static class Factory implements AnalysisListenerFactory {
         private final SourceReceiver sourceReceiver;
         private final TraceSegmentSampler sampler;
+        private final boolean forceSampleErrorSegment;
         private final NamingControl namingControl;
+        private final List<String> searchTagKeys;
+        private final SegmentStatusAnalyzer segmentStatusAnalyzer;
+        private final TraceLatencyThresholdsAndWatcher traceLatencyThresholdsAndWatcher;
 
         public Factory(ModuleManager moduleManager, AnalyzerModuleConfig config) {
             this.sourceReceiver = moduleManager.find(CoreModule.NAME).provider().getService(SourceReceiver.class);
+            final ConfigService configService = moduleManager.find(CoreModule.NAME)
+                                                             .provider()
+                                                             .getService(ConfigService.class);
+            this.searchTagKeys = Arrays.asList(configService.getSearchableTracesTags().split(Const.COMMA));
             this.sampler = new TraceSegmentSampler(config.getTraceSampleRateWatcher());
+            this.forceSampleErrorSegment = config.isForceSampleErrorSegment();
             this.namingControl = moduleManager.find(CoreModule.NAME)
                                               .provider()
                                               .getService(NamingControl.class);
+            this.segmentStatusAnalyzer = SegmentStatusStrategy.findByName(config.getSegmentStatusAnalysisStrategy())
+                                                              .getExceptionAnalyzer();
+            this.traceLatencyThresholdsAndWatcher = config.getTraceLatencyThresholdsAndWatcher();
         }
 
         @Override
         public AnalysisListener create(ModuleManager moduleManager, AnalyzerModuleConfig config) {
-            return new SegmentAnalysisListener(sourceReceiver, sampler, namingControl);
+            return new SegmentAnalysisListener(
+                sourceReceiver,
+                sampler,
+                forceSampleErrorSegment,
+                namingControl,
+                searchTagKeys,
+                segmentStatusAnalyzer,
+                traceLatencyThresholdsAndWatcher
+            );
         }
     }
 }

@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 import org.apache.skywalking.oap.server.core.query.AggregationQueryService;
+import org.apache.skywalking.oap.server.core.query.MetricDefinition;
 import org.apache.skywalking.oap.server.core.query.MetricsMetadataQueryService;
 import org.apache.skywalking.oap.server.core.query.MetricsQueryService;
 import org.apache.skywalking.oap.server.core.query.PointOfTime;
@@ -100,9 +101,19 @@ public class MetricsQuery implements GraphQLQueryResolver {
     }
 
     /**
+     * Get the list of all available metrics in the current OAP server.
+     *
+     * @param regex to filter the metrics by name, if existing.
+     * @return all available metrics.
+     */
+    public List<MetricDefinition> listMetrics(String regex) {
+        return getMetricsMetadataQueryService().listMetrics(regex);
+    }
+
+    /**
      * Read metrics single value in the duration of required metrics
      */
-    public int readMetricsValue(MetricsCondition condition, Duration duration) throws IOException {
+    public long readMetricsValue(MetricsCondition condition, Duration duration) throws IOException {
         if (MetricsType.UNKNOWN.equals(typeOfMetrics(condition.getName())) || !condition.getEntity().isValid()) {
             return 0;
         }

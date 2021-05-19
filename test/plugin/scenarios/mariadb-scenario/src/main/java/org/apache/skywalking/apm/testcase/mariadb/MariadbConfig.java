@@ -25,10 +25,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class MariadbConfig {
-    private static Logger logger = LogManager.getLogger(MariadbConfig.class);
-    private static String url;
-    private static String userName;
-    private static String password;
+    private static final Logger LOGGER = LogManager.getLogger(MariadbConfig.class);
+    private static String URL;
+    private static String USER_NAME;
+    private static String PASSWORD;
 
     static {
         InputStream inputStream = MariadbConfig.class.getClassLoader().getResourceAsStream("/jdbc.properties");
@@ -36,23 +36,23 @@ public class MariadbConfig {
         try {
             properties.load(inputStream);
         } catch (IOException e) {
-            logger.error("Failed to load config", e);
+            LOGGER.error("Failed to load config", e);
         }
 
-        url = properties.getProperty("mariadb.url");
-        userName = properties.getProperty("mariadb.username");
-        password = properties.getProperty("mariadb.password");
+        URL = properties.getProperty("mariadb.url");
+        USER_NAME = properties.getProperty("mariadb.username");
+        PASSWORD = properties.getProperty("mariadb.password");
     }
 
     public static String getUrl() {
-        return url;
+        return URL;
     }
 
     public static String getUserName() {
-        return userName;
+        return USER_NAME;
     }
 
     public static String getPassword() {
-        return password;
+        return PASSWORD;
     }
 }

@@ -47,7 +47,7 @@ public class OnSuccessInterceptor implements InstanceMethodsAroundInterceptor {
         SendStatus sendStatus = ((SendResult) allArguments[0]).getSendStatus();
         if (sendStatus != SendStatus.SEND_OK) {
             activeSpan.errorOccurred();
-            Tags.STATUS_CODE.set(activeSpan, sendStatus.name());
+            Tags.MQ_STATUS.set(activeSpan, sendStatus.name());
         }
         ContextManager.continued(enhanceInfo.getContextSnapshot());
     }
@@ -62,6 +62,6 @@ public class OnSuccessInterceptor implements InstanceMethodsAroundInterceptor {
     @Override
     public void handleMethodException(EnhancedInstance objInst, Method method, Object[] allArguments,
         Class<?>[] argumentsTypes, Throwable t) {
-        ContextManager.activeSpan().errorOccurred().log(t);
+        ContextManager.activeSpan().log(t);
     }
 }
